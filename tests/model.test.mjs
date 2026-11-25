@@ -1,0 +1,8 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {newFamily,makeText,validateFamily} from '../dist/model.mjs';
+test('fractional free-text quantities and blank units preserve intent',()=>{const f=newFamily('範例');f.sections.food[0].values={amount:'三分之一',unit:'杯'};assert.match(makeText(f),/三分之一杯/);f.sections.food[0].values={amount:'少許'};assert.match(makeText(f),/份量：少許。/);assert.doesNotMatch(makeText(f),/每天|早晚/);});
+test('customer text cannot serialize photos or internal photo metadata',()=>{const f=newFamily('範例');f.photos=[{name:'secret.jpg',caption:'內部照片說明',driveId:'private-photo-id',thumb:'data:image/jpeg;base64,private'}];f.internalSecret='secret';const text=makeText(f);assert.doesNotMatch(text,/secret|內部照片|private|data:image/);});
+test('leftover in bowl is distinct from opened unused food',()=>{const f=newFamily();f.sections.food[0].values={leftover:'清掉換新',opened:'冷藏保存',openedNote:'玻璃盒，下一餐回溫'};assert.match(makeText(f),/碗內剩食：清掉換新/);assert.match(makeText(f),/開封後未盛出的食物：冷藏保存/);});
+test('schema rejects malformed restores and drops unknown properties',()=>{const f=newFamily('範例');assert.equal(validateFamily(f).name,'範例');assert.throws(()=>validateFamily({...f,schema:2}));f.sections.food[0].values.secret='bad';assert.equal(validateFamily(f).sections.food[0].values.secret,undefined);assert.throws(()=>validateFamily({...f,photos:[{id:'x',name:'x',mime:'text/html'}]}));});
+test('multiple shared recipes preserve per-child exceptions and ordering',()=>{const f=newFamily();f.sections.food=[{values:{kind:'乾糧',amount:'一',unit:'平匙'},note:'小虎半匙，其他孩子一匙。'},{values:{kind:'罐頭／餐包',amount:'半',unit:'罐'},note:'吃完再洗碗。'}];assert.match(makeText(f),/一平匙[\s\S]*小虎半匙[\s\S]*半罐[\s\S]*吃完再洗碗/);});
