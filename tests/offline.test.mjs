@@ -1,0 +1,36 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import vm from 'node:vm';
+import {readFile} from 'node:fs/promises';
+import {DriveStore} from '../docs/drive.mjs';
+
+test('offline shell can restore the app and every versioned import; private URLs bypass cache',async()=>{
+ const events={},cache=new Map();
+ const scope='https://example.test/lili-homecare/';
+ const storage={
+  async addAll(urls){
+   for(const url of urls){const path=new URL(url).pathname.slice('/lili-homecare/'.length);
+    const file=await readFile(new URL('../docs/'+path,import.meta.url));
+    cache.set(url,file);}
+  },
+  async match(req){return cache.get(typeof req==='string'?req:req.url);}
+ };
+ const self={registration:{scope},addEventListener:(type,callback)=>{events[type]=callback;},skipWaiting:async()=>{}};
+ vm.runInNewContext(await readFile(new URL('../docs/sw.js',import.meta.url),'utf8'),{
+  URL,self,caches:{open:async()=>storage},fetch:async()=>{throw new Error('test network offline');}
+ });
+ let installed;events.install({waitUntil:p=>{installed=p;}});await installed;
+ function respond(url,mode){let response;events.fetch({request:{url,method:'GET',mode},respondWith:p=>{response=p;}});return response;}
+ const html=(await respond(scope+'?home','navigate')).toString();
+ const script=html.match(/type="module" src="([^"]+)"/)[1];
+ const entry=(await respond(new URL(script,scope).href,'cors')).toString();
+ for(const match of entry.matchAll(/from '([^']+)'/g))assert.ok(await respond(new URL(match[1],scope).href,'cors'));
+ assert.equal(respond('https://www.googleapis.com/drive/v3/files/not-a-real-id?alt=media','cors'),undefined);
+ assert.equal(respond('https://accounts.google.com/gsi/client','cors'),undefined);
+});
+
+test('expired background grant cannot start interactive OAuth',async()=>{
+ const drive=new DriveStore();
+ await assert.rejects(drive.connect('unused',{token:'test-only',expires:Date.now()-1}),/授權已到期/);
+ assert.equal(drive.token,null);
+});

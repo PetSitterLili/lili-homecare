@@ -11,7 +11,10 @@ const ROOT='https://www.googleapis.com/drive/v3';
 export class DriveStore {
  constructor(){this.token=null;this.root=null;this.backupTimes=new Map();}
  async connect(clientId,session){
-  if(session?.expires>Date.now()+5000){this.token=session.token;this.expires=session.expires;}else{
+  if(session){
+   if(!session.token||session.expires<=Date.now()+5000)throw Error('Google 授權已到期，請重新連接。');
+   this.token=session.token;this.expires=session.expires;
+  }else{
   if(!window.google?.accounts?.oauth2)throw Error('Google 連線元件尚未載入，請確認網路後再試。');
   const auth=await new Promise((resolve,reject)=>{const c=google.accounts.oauth2.initTokenClient({client_id:clientId,scope:'https://www.googleapis.com/auth/drive.file',hint:'petsitterlili2025@gmail.com',callback:r=>r.error?reject(Error(r.error_description||r.error)):resolve(r),error_callback:()=>reject(Error('Google 授權未完成。'))});c.requestAccessToken({prompt:''});});
   this.token=auth.access_token;this.expires=Date.now()+Number(auth.expires_in)*1000;
