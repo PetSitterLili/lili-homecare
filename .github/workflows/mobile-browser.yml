@@ -1,0 +1,23 @@
+name: Mobile Chrome care workflow
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'tests/mobile_browser.py'
+      - '.github/workflows/mobile-browser.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline-care:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install browser test driver
+        run: python -m pip install playwright==1.56.0
+      - name: Run mobile and offline scenarios with installed Chrome
+        run: python tests/mobile_browser.py
