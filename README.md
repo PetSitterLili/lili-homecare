@@ -1,44 +1,37 @@
-# ㄌㄌ保姆｜家訪資料與照護計畫書
+# ㄌㄌ保姆｜家訪到實際照護
+The Pet Sitter Lili 的獨立 App。既有 lili-pet-prereport 與多寵點名板不修改。
 
-The Pet Sitter Lili 的獨立 App。原本的 `lili-pet-prereport` 與多寵點名板皆未修改。
+## 第二版
+- 首頁是家庭與本次照護小卡，編輯資料為獨立頁。
+- 預約、方案、家長姓名／電話／緊急聯絡／地址、鑰匙與 WiFi。
+- 貓狗分頁與各毛寶的小活頁；貓不顯示散步，狗有返家整理勾選。
+- 乾乾、濕食、零食固定三區，份量短格並排，混糧按需展開。
+- 食水後接簡單洗滌區。例外留補充，不再拆問每個細節。
+- 影像分享三態及條件備註。家長 PDF 不包含照片、照片說明或照片連結。
+- 服務小卡依主資料產生，各趟勾選分開保存；主資料改動會提示小卡過期。
+- 所有清除／刪除先確認，可復原最近 40 次主資料操作。
+- IndexedDB 原瀏覽器草稿與照片原檔，修改後自動保存。Drive 連線後自動同步，版本檢查及寫入讀回。
+- A4 PDF 直接生成，清淡霧紫卡片、小貓線條插圖、自然換頁；台灣日期自動命名，可在下載前改名。
+- 完整備份含照片原檔，還原獨立副本；可保留第一版資料。
 
-## 目前功能
+## 正式使用前仍需完成
+執行環境暫不可用，因此第二版尚未做瀏覽器實測、照片操作、PDF 視覺及真實 Google 授權測試。GitHub 程式變更不等於 Sites 已部署。
 
-- 每家庭可編輯的照護欄位、自由文字份量、選項及自訂值。
-- 每一欄單獨清除，新增／移除一組，復原最近 40 次修改。
-- 各照護類別保留整段補充，共用流程與個別差異並存。
-- 每家庭獨立內部照片頁，多張上傳、可選說明、縮圖、原檔放大。
-- 文字計畫書由明確欄位組成，允許再編輯，TXT 下載／複製；不包含照片、照片說明與 Drive 照片 ID。
-- 以 Google Drive 為主要持久儲存，寫入後讀回核對，覆寫前建立還原副本。
-- 每家庭完整 JSON 備份包含照片原始檔，還原會建立新副本。
+Google OAuth client ID 仍未設定。不能把 ChatGPT 的 Drive 連接直接當成 App 授權。需以 petsitterlili2025@gmail.com 建立 Web OAuth client、啟用 Drive API，設定正式 origin，使用 drive.file 範圍；由使用者在 Google 同意畫面完成授權。不要把密碼、client secret、access token 寫進儲存庫。
 
-## 必須完成的 Google 設定
+未連線只保存原瀏覽器 IndexedDB，換瀏覽器無法直接讀取。本機不是唯一正式保存處；請完成 Drive 連線並下載獨立完整備份。同步採 Drive version preflight，適合一人單工作階段操作，不是交易資料庫，多裝置同時寫同一家仍有競爭風險。
 
-目前沒有 OAuth client ID，尚未以真實 Google 帳號完成連線測試。未連線資料只存在目前頁面記憶體，頁面會明確提醒，請勿當成正式保存處。localStorage 只保存 OAuth client ID，不保存家庭資料或 access token。
+照片原檔留在 Drive 私人資料夾，App 不建立公開權限。移除照片只移除參照，不永久刪 Drive 原檔。每個工作階段同一雲端檔案至多每小時建立一次 JSON 還原副本，避免每次自動儲存都建立副本。完整備份為內部資料，不可傳家長。
 
-1. 以保姆帳號 `petsitterlili2025@gmail.com` 在 Google Cloud 建立或選擇專用專案。
-2. 啟用 Google Drive API，設定 Google Auth Platform OAuth 同意畫面。
-3. 使用 Web application client，設定 App 的正式網域為 Authorized JavaScript origin（僅 origin，不含路徑）。
-4. 申請範圍只有 `https://www.googleapis.com/auth/drive.file`。若處於 Testing 狀態，把保姆帳號加入 test users。
-5. 將 client ID 填入 App「雲端設定」，接著按「連接保姆 Google Drive」，由使用者自行授權。
-6. 正式使用前測試新增家庭、重開載入、修改儲存、照片、下載完整備份，以及在另一個工作階段還原。
+PDF 由瀏覽器 canvas 排版並嵌入 JPEG，確保中文字在接收端一致；文字不可搜尋／選取，也不是可及性標籤 PDF。需在 Android 與桌面驗證字體、跨頁及記憶體。內容與照片完全隔離。系統存檔選擇器可讓使用者選手機資料夾；不支援時回退一般下載，沒有聲稱能免授權寫入任意資料夾。
 
-此 App 的 OAuth 授權與 ChatGPT 的 Google Drive 連接為不同授權，不能互相代用。不需要將任何密碼或 client secret 寫進程式碼。
+第一版的 Drive 家庭檔案載入時轉為新版草稿，原始資料保留在 legacy，舊內容會附在其他交代供整理，不靜默丟棄。服務日期目前為自由文字，無法自動解析每日例外；需要使用者逐趟核對，App 不自行推測哪些指示屬於哪一天。
 
-## 資料結構與隱私
+## 驗證
+模型邏輯已在可用 JavaScript 執行器檢查：日期、照片隔離、分數份量、貓狗散步、陪伴提醒、健康空白、小卡過期與舊資料保留。
+環境恢復後：
+node --test tests/*.test.mjs
+node --check dist/workspace.mjs
+node --check dist/plan-pdf.mjs
 
-App 建立私人 `ㄌㄌ保姆_家庭照護檔案` 資料夾。每家庭一個 JSON，照片為獨立原始檔，縮圖放在私有 JSON。照片用 appProperties.familyId 關聯家庭。資料與照片都不放進 GitHub，也不放進網站原始碼。
-
-本版無客戶分享頁，也不建立 Drive 公開權限。客戶只取得使用者下載或複製的文字。完整備份屬內部資料，含照片，請勿作為家長文件傳送。
-
-移除照片只從家庭記錄移除，不會永久刪除 Drive 原始檔。覆寫前的 JSON 還原副本位於同一資料夾，可以從 Drive 下載 JSON，再由管理者協助取回；介面目前只直接支援 App 完整備份格式的還原。還原副本不替代獨立完整備份。
-
-家庭 JSON 記錄 Drive version，儲存前檢查版本，並在可取得 ETag 時使用條件寫入。Google Drive 不是交易型資料庫，本版適合一位保姆單一工作階段編輯，不建議多台裝置同時寫同一家。未連線或權限到期時會保留目前畫面，不假報儲存成功。
-
-目前照片支援 JPEG/PNG/WebP，每張最多 40 MB。原始照片不壓縮，列表只產生 400 像素 JPEG 縮圖。完整備份以 base64 包含原圖，約增加三分之一大小，大型相簿備份需要較多瀏覽器記憶體。
-
-本版不會匯入真實家訪資料，範例為虛構。既有 Google 表單繼續保留，是否取代仍未決定。
-
-## 驗證與部署
-
-靜態輸出位於 `dist/`，無需套件安裝。執行 `node --test tests/*.test.mjs`，以及 `node --check dist/app.mjs`。設定靜態網站根目錄為 `dist`，使用 HTTPS。`robots` 排除索引僅為附加提示，不能代替授權；資料存取由 Google OAuth 控制，網站另由私人 Sites 存取控制保護。
+靜態目錄為 dist。舊版檔案保留供回退，index.html 使用 workspace.mjs。部署與真實 Drive 完成前不宣稱正式可用。
