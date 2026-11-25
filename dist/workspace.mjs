@@ -1,7 +1,7 @@
 
 import {fresh,blanks,fields,titles,day,filename,mediaLabel,warnings,publicBlocks,tasks,sourceKey,normalize,migrate} from './workspace-model.mjs';
 import {makeText as legacyText} from './model.mjs';
-import {DriveStore} from './drive.mjs';
+import {DriveStore} from './drive.mjs?v=20261125-drive2';
 import {openDB,storeDB} from './drafts.mjs';
 import {buildPDF} from './plan-pdf.mjs';
 const $=id=>document.getElementById(id),drive=new DriveStore(),db=storeDB(await openDB().catch(error=>{$('main').innerHTML='<div class="panel"><h1>目前無法啟用草稿保存</h1><p>此瀏覽器未能開啟本機資料庫，請換外部瀏覽器或檢查儲存空間；尚未開放填寫，避免資料遺失。</p></div>';throw error;}));
