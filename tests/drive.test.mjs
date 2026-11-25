@@ -14,7 +14,8 @@ function fixture({remote=original,conditional=true,race=false,etag='"2"'}={}){
    probes++;if(conditional)throw Object.assign(Error('precondition'),{status:412});
    return {id:'copy'};
   }
-  if(options.method==='PATCH'){
+  if(path.includes('/drive/v2/files/')&&!options)return {id:'family',version:'12'};
+  if(options.method==='PUT'){
    if(race){state={...original,note:'remote edit'};throw Object.assign(Error('concurrent'),{status:412});}
    assert.equal(options.headers['If-Match'],etag);state=JSON.parse(await options.body.get('file').text());writes++;return {id:'family',version:'13'};
   }

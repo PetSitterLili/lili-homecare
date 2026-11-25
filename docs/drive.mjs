@@ -53,16 +53,21 @@ export class DriveStore {
    if(!remote.base&&current.base!==previousAttempt&&remote.version!==current.version)throw Object.assign(Error('資料衝突待確認：舊草稿缺少可比較的基準，請保留副本再載入雲端'),{remoteId:remote.id});
    if(current.data.id!==data.id || (current.base!==previousAttempt&&(remote.base?remote.base!==current.base:remote.version!==current.version)))
     throw Error('資料衝突：雲端內容與上次同步基準不同，已保留兩邊資料');
-   if(!current.etag)throw Error('無法確認雲端條件寫入，已保留草稿');
+   if(!current.etag){
+    const meta=await this.request('https://www.googleapis.com/drive/v2/files/'+encodeURIComponent(remote.id)+'?fields=id,etag,version');
+    if(meta.version!==current.version){if(retry)return this.save(data,remote,role,reservedId,previousAttempt,false);throw Error('檔案正在更新，稍候會自動重試');}
+    if(!meta.etag)throw Error('無法確認雲端條件寫入，已保留草稿');
+    current.etag=meta.etag;
+   }
    let copy=null;if(!this.conditionalVerified||Date.now()-(this.backupTimes.get(remote.id)||0)>60*60*1000){copy=await this.request(`/files/${encodeURIComponent(remote.id)}/copy?fields=id`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:`${data.name}＿還原副本＿${new Date().toISOString()}.json`,appProperties:{liliRole:'recovery-v1',familyId:data.id}})});this.backupTimes.set(remote.id,Date.now());}
    if(!this.conditionalVerified){
     if(!copy)throw Error('無法確認條件寫入，請重新連接 Drive');
     const probe=new FormData();probe.append('metadata',new Blob(['{}'],{type:'application/json'}));probe.append('file',new Blob([JSON.stringify(current.data)],{type:'application/json'}));
-    try{await this.request('https://www.googleapis.com/upload/drive/v3/files/'+encodeURIComponent(copy.id)+'?uploadType=multipart&fields=id',{method:'PATCH',headers:{'If-Match':'"lili-invalid-precondition"'},body:probe});}
+    try{await this.request('https://www.googleapis.com/upload/drive/v2/files/'+encodeURIComponent(copy.id)+'?uploadType=multipart&fields=id',{method:'PUT',headers:{'If-Match':'"lili-invalid-precondition"'},body:probe});}
     catch(error){if(error.status!==412)throw error;this.conditionalVerified=true;}
     if(!this.conditionalVerified)throw Error('Drive 未執行條件寫入保護，更新已暫停，本機草稿保留');
    }
-   const form=new FormData();form.append('metadata',new Blob([JSON.stringify({name:`${data.name}＿照護資料.json`})],{type:'application/json'}));form.append('file',new Blob([JSON.stringify(data)],{type:'application/json'}));let r;try{r=await this.request(`https://www.googleapis.com/upload/drive/v3/files/${encodeURIComponent(remote.id)}?uploadType=multipart&fields=id,version`,{method:'PATCH',headers:{'If-Match':current.etag},body:form});}catch(error){if(error.status===412&&retry)return this.save(data,{...remote,base:current.base},role,reservedId,previousAttempt,false);throw error;}
+   const form=new FormData();form.append('metadata',new Blob([JSON.stringify({title:`${data.name}＿照護資料.json`})],{type:'application/json'}));form.append('file',new Blob([JSON.stringify(data)],{type:'application/json'}));let r;try{r=await this.request(`https://www.googleapis.com/upload/drive/v2/files/${encodeURIComponent(remote.id)}?uploadType=multipart&fields=id,version`,{method:'PUT',headers:{'If-Match':current.etag},body:form});}catch(error){if(error.status===412&&retry)return this.save(data,{...remote,base:current.base},role,reservedId,previousAttempt,false);throw error;}
    return {id:r.id,version:r.version,recoveryId:copy?.id};
   }
   const r=await this.upload(`${data.name||'未命名家庭'}＿照護資料.json`,new Blob([JSON.stringify(data)],{type:'application/json'}),role,data.id,reservedId);return {id:r.id,version:r.version};
