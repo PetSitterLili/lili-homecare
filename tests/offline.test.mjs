@@ -34,3 +34,21 @@ test('expired background grant cannot start interactive OAuth',async()=>{
  await assert.rejects(drive.connect('unused',{token:'test-only',expires:Date.now()-1}),/授權已到期/);
  assert.equal(drive.token,null);
 });
+
+test('tab grant survives a page reload but rejects tampering and expiration',async()=>{
+ const {rememberGrant,recallGrant}=await import('../docs/tab-grant.mjs');
+ const session=new Map(),keys=new Map();
+ const db={get:async(_,k)=>keys.get(k),getOrInsert:async(_,k,v)=>{keys.set(k,keys.get(k)||v);return keys.get(k);}};
+ const descriptor=Object.getOwnPropertyDescriptor(globalThis,'sessionStorage');
+ Object.defineProperty(globalThis,'sessionStorage',{configurable:true,value:{
+  setItem:(k,v)=>session.set(k,v),getItem:k=>session.get(k),removeItem:k=>session.delete(k)
+ }});
+ try{
+  const grant={token:'synthetic-for-test',expires:Date.now()+60000};
+  await rememberGrant(db,grant);assert.deepEqual(await recallGrant(db),grant);
+  const [slot,value]=[...session][0];assert.ok(!value.includes(grant.token));assert.equal([...keys.values()][0].extractable,false);
+  const changed=JSON.parse(value);changed.expires+=10000;session.set(slot,JSON.stringify(changed));
+  assert.equal(await recallGrant(db),null);assert.equal(session.size,0);
+  session.set(slot,JSON.stringify({...changed,expires:Date.now()-1}));assert.equal(await recallGrant(db),null);
+ }finally{if(descriptor)Object.defineProperty(globalThis,'sessionStorage',descriptor);else delete globalThis.sessionStorage;}
+});
