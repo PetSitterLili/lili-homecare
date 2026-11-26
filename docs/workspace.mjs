@@ -46,6 +46,10 @@ function heading(text){const h=document.createElement('h3');h.textContent=text;r
 function field(obj,key,label,{long=false,options=null,compact=false,placeholder=''}={}){const spec=!options&&entry&&noteSpecs(entry.f).find(s=>s.obj===obj&&s.key===key);if(spec)return careNoteField(spec,label,placeholder);const wrap=document.createElement('div');wrap.className='field'+(compact?' compact':'');const head=document.createElement('div');head.className='fieldhead';const l=document.createElement('span');l.textContent=label;head.append(l,button('清除',async()=>{if(!obj[key])return;if(await confirmAction('清除此欄？','只清除「'+label+'」，其他資料不變。','確認清除')){snapshot();obj[key]='';dirty();input.value='';}},'clear'));let input=document.createElement(options?'select':long?'textarea':'input');input.setAttribute('aria-label',label);input.placeholder=placeholder;
 if(options){const values=['',...new Set([...options,...(obj[key]&&!options.includes(obj[key])?[obj[key]]:[])])];for(const v of values){const o=document.createElement('option');o.value=v;o.textContent=v||'尚未確認';input.append(o);}input.onchange=()=>{snapshot();obj[key]=input.value;dirty();};}else input.oninput=()=>{snapshot();obj[key]=input.value;dirty();};input.value=obj[key]||'';wrap.append(head,input);return wrap;}
 
+function resizeCareNote(t){t.style.height='auto';t.style.height=Math.max(t.scrollHeight+2,44)+'px';}
+document.addEventListener('click',e=>{if(!e.target.closest?.('.care-note-flag-group'))document.querySelectorAll('.care-note-menu').forEach(m=>{m.hidden=true;m.parentElement.querySelector('.care-note-arrow')?.setAttribute('aria-expanded','false');});});
+document.addEventListener('toggle',e=>{if(e.target instanceof HTMLDetailsElement&&e.target.open)requestAnimationFrame(()=>e.target.querySelectorAll('.care-note-body textarea').forEach(resizeCareNote));},true);
+window.addEventListener('resize',()=>document.querySelectorAll('.care-note-body textarea').forEach(resizeCareNote));
 function careNoteField(spec,label,placeholder){
  const f=entry.f,wrap=document.createElement('div');wrap.className='field care-note-field';
  const head=document.createElement('div');head.className='fieldhead';const title=document.createElement('span');title.textContent=label;head.append(title);wrap.append(head);
@@ -55,7 +59,7 @@ function careNoteField(spec,label,placeholder){
  const blank=()=>({id:crypto.randomUUID(),text:'',flag:spec.flag,temp:false,cycle:'',closed:false});
  if(!rows.length)rows=[blank()];
  const save=()=>{writeNoteRows(spec,rows);dirty();};
- const resize=t=>{t.style.height='auto';t.style.height=Math.max(t.scrollHeight+2,44)+'px';};
+ const resize=resizeCareNote;
  const draw=focus=>{
   list.replaceChildren();
   for(const n of rows){
@@ -69,9 +73,9 @@ function careNoteField(spec,label,placeholder){
    const flagIcon=document.createElementNS('http://www.w3.org/2000/svg','svg');flagIcon.setAttribute('viewBox','0 0 28 28');flagIcon.setAttribute('aria-hidden','true');
    flagIcon.innerHTML='<path d="M6 25V4 M6 5C12 0 17 10 23 4V17C17 23 12 12 6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><g class="care-note-clock"><circle cx="21" cy="21" r="6.5" fill="#F8F5EE" stroke="currentColor" stroke-width="1.3"/><path d="M21 17V21L24 22" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></g>';
    flag.append(flagIcon);
-   const arrow=button('⌄',()=>toggleMenu(),'care-note-arrow');arrow.setAttribute('aria-label','旗標與有效期限');
+   const arrow=button('⌄',()=>toggleMenu(),'care-note-arrow');arrow.setAttribute('aria-label','旗標與有效期限');arrow.setAttribute('aria-expanded','false');
    const menu=document.createElement('div');menu.className='care-note-menu';menu.hidden=true;
-   const toggleMenu=()=>{const open=menu.hidden;wrap.querySelectorAll('.care-note-menu').forEach(e=>e.hidden=true);menu.hidden=!open;arrow.setAttribute('aria-expanded',String(open));};
+   const toggleMenu=()=>{const open=menu.hidden;document.querySelectorAll('.care-note-menu').forEach(e=>{e.hidden=true;e.parentElement.querySelector('.care-note-arrow')?.setAttribute('aria-expanded','false');});menu.hidden=!open;arrow.setAttribute('aria-expanded',String(open));};
    const options=[['不加入小卡',false,false],['長期複核',true,false],['僅限本期複核',true,true],['僅限本期備註',false,true]];
    for(const [caption,flagged,temp] of options){menu.append(button(caption,()=>{snapshot();Object.assign(n,{flag:flagged,temp,cycle:temp?noteCycle(f):'',closed:false});save();menu.hidden=true;arrow.setAttribute('aria-expanded','false');paint();}));}
    const end=button('結束本期事項（保留歷史）',()=>{snapshot();n.closed=true;save();menu.hidden=true;arrow.setAttribute('aria-expanded','false');paint();});menu.append(end);
@@ -102,12 +106,12 @@ function section(title,open=true){const e=document.createElement('details');e.op
 function quantity(o){const w=document.createElement('div');w.className='field';const h=document.createElement('div');h.className='fieldhead';h.textContent='每次份量';const row=document.createElement('div');row.className='amount';for(const [key,ph]of[['amount','三分之一'],['unit','杯']]){const input=document.createElement('input');input.value=o[key]||'';input.placeholder=ph;input.setAttribute('aria-label',key==='amount'?'份量':'份量單位');input.oninput=()=>{snapshot();o[key]=input.value;dirty();};const container=document.createElement('div');container.append(input,button('清除',async()=>{if(o[key]&&await confirmAction('清除這一格？','只清除'+(key==='amount'?'份量':'單位')+'，不影響其他資料。','確認清除')){snapshot();o[key]='';input.value='';dirty();}},'clear'));row.append(container);}w.append(h,row);return w;}
 function showConsent(){
  const el=$('mediaBadge');if(!el||!entry)return;
- const media=activeFamily(entry.f).media;
+ const media=entry.f.media;const spec={obj:media,key:'note',flag:false,prefix:''};const noteText=noteRows(spec).filter(r=>noteActive(entry.f,r)&&r.text.trim()).map(r=>r.text).join('\n');
  el.dataset.consent=media.status;
  const label=document.createElement('span');label.textContent='服務影像對外分享';
  const state=document.createElement('strong');state.textContent=({yes:'我願意分享',no:'我不願意分享'})[media.status]||'尚未確認';
  el.replaceChildren(label,state);
- if(media.note?.trim()){const note=document.createElement('small');note.textContent='拍攝與分享備註　'+media.note;el.append(note);}
+ if(noteText.trim()){const note=document.createElement('small');note.textContent='拍攝與分享備註　'+noteText;el.append(note);}
 }
 function frame(){const f=entry.f;$('main').innerHTML='<div class="filehead"><div><h1>'+esc(f.name||'未命名家庭')+'</h1><span class="muted">'+esc((bookingSegments(f.booking).length?bookingSegments(f.booking).map(r=>r.a+(r.a===r.b?'':'～'+r.b)).join('、'):f.booking.dates)||'本次預約尚未填寫')+'</span></div><div class="badge" id="mediaBadge"></div></div><span id="saveState" class="save" role="status"></span><div id="nav" class="nav"></div><div id="content"></div><div id="foot" class="foot"></div>';showConsent();for(const [v,t]of[['service','本次照護'],['edit','編輯家訪資料'],['photos','內部照片'],['plan','A4 計畫書']])$('nav').append(button(t,async()=>{if(photoBusy){toast('照片正在保存，請稍候。');return;}await localChain;view=v;render();},view===v?'active':''));$('foot').append(button('立即同步 Drive',()=>{if(!ready()){toast('目前無法同步，請確認網路或重新連接 Google Drive。');return;}blocked.delete(entry.id);entry.syncError='';schedule();}),button('下載完整備份（內部）',backup),button('復原上一步',()=>{if(!undo.length){toast('目前沒有可復原的修改');return;}entry.f=JSON.parse(undo.pop());dirty();render();}));$('foot').append(button(f.archived?'復原家庭':'刪除家庭',async()=>{
  const r=entry;const verb=r.f.archived?'復原':'刪除';
