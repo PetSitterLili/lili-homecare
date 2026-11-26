@@ -1,13 +1,13 @@
-import {inspectCarePatch,applyCarePatch} from './care-patch.mjs?v=2.0.1126.47';
-import {rememberGrant,recallGrant,forgetGrant} from './tab-grant.mjs?v=2.0.1126.47';
-import {displayQuoteLabel,legacyQuoteReference,oldBookingText,hasCurrentBooking,inquiryQuote,mixedPlan,mixedCare,mixedService,defaultRates,readRates,days,travel,rate,holidayRows,quoteKey,savedQuote,quoteLines,money,overtimeText} from './quote.mjs?v=2.0.1126.47';
-import {brandDefaults,readBrand} from './brand.mjs?v=2.0.1126.47';
+import {inspectCarePatch,applyCarePatch} from './care-patch.mjs?v=2.0.1126.48';
+import {rememberGrant,recallGrant,forgetGrant} from './tab-grant.mjs?v=2.0.1126.48';
+import {displayQuoteLabel,legacyQuoteReference,oldBookingText,hasCurrentBooking,inquiryQuote,mixedPlan,mixedCare,mixedService,defaultRates,readRates,days,travel,rate,holidayRows,quoteKey,savedQuote,quoteLines,money,overtimeText} from './quote.mjs?v=2.0.1126.48';
+import {brandDefaults,readBrand} from './brand.mjs?v=2.0.1126.48';
 
-import {validReservation,reservationPeriods,readLineReservations,reservationLines,reservationSegments,inspectLineReservations,applyLineReservations,sortFamilyDirectory,validServiceDate,taipeiDate,nextBookingDate,orderUpcomingFamilies,recentFamilyIds,profileStages,safeProfileUrl,readProfile,familyArea,profileAge,matchesProfile,prepareProfilePatch,applyProfilePatch,bookingDateGroups,replaceBookingDates,bookingDateLabel,lineHistory,prepareLineHistory,applyLineHistory,syncOverview,matchesFamily,prepareLegacyBatch,noteSpecs,noteRows,writeNoteRows,noteCycle,noteActive,bindPendingNotes,activeFamily,bookingSegments,bookingLines,serviceName,fresh,blanks,fields,titles,day,filename,mediaLabel,warnings,publicBlocks,tasks,sourceKey,normalize,migrate} from './workspace-model.mjs?v=2.0.1126.47';
-import {makeText as legacyText} from './model.mjs?v=2.0.1126.47';
-import {DriveStore,digest} from './drive.mjs?v=2.0.1126.47';
-import {openDB,storeDB} from './drafts.mjs?v=2.0.1126.47';
-import {buildPDF,auditLegacyCoverage} from './plan-pdf.mjs?v=2.0.1126.47';
+import {validReservation,reservationPeriods,readLineReservations,reservationLines,reservationSegments,inspectLineReservations,applyLineReservations,sortFamilyDirectory,validServiceDate,taipeiDate,nextBookingDate,orderUpcomingFamilies,recentFamilyIds,profileStages,safeProfileUrl,readProfile,familyArea,profileAge,matchesProfile,prepareProfilePatch,applyProfilePatch,bookingDateGroups,replaceBookingDates,bookingDateLabel,lineHistory,prepareLineHistory,applyLineHistory,syncOverview,matchesFamily,prepareLegacyBatch,noteSpecs,noteRows,writeNoteRows,noteCycle,noteActive,bindPendingNotes,activeFamily,bookingSegments,bookingLines,serviceName,fresh,blanks,fields,titles,day,filename,mediaLabel,warnings,publicBlocks,tasks,sourceKey,normalize,migrate} from './workspace-model.mjs?v=2.0.1126.48';
+import {makeText as legacyText} from './model.mjs?v=2.0.1126.48';
+import {DriveStore,digest} from './drive.mjs?v=2.0.1126.48';
+import {openDB,storeDB} from './drafts.mjs?v=2.0.1126.48';
+import {buildPDF,auditLegacyCoverage} from './plan-pdf.mjs?v=2.0.1126.48';
 const $=id=>document.getElementById(id),drive=new DriveStore(),db=storeDB(await openDB().catch(error=>{$('main').innerHTML='<div class="panel"><h1>目前無法啟用草稿保存</h1><p>此瀏覽器未能開啟本機資料庫，請換外部瀏覽器或檢查儲存空間；尚未開放填寫，避免資料遺失。</p></div>';throw error;}));
 let records=await db.all(),entry=null,view='service',kind='cat',petIndex=0,undo=[],syncTimer,localChain=Promise.resolve(),syncBusy=false,photoBusy=false,pdf=null,photoUrl=null,localFailure=false;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -628,9 +628,16 @@ function bookingEditor(b,groups,imported=null){
  let visits=[blank()];
  const owner=entry,revision=entry?.rev,draft=imported?structuredClone(imported.r):null;
  let importGroups=[],importIndex=0;
- if(draft){const map=new Map();for(const d of draft.days){const key=JSON.stringify(d.visits);if(!map.has(key))map.set(key,{dates:[],visits:d.visits?d.visits.map(v=>({...v,minutes:v.minutes===null?'':String(v.minutes)})):[]});map.get(key).dates.push(d.date);}importGroups=[...map.values()];}
+ if(draft){const map=new Map();for(const d of draft.days){const key=JSON.stringify(d.visits);if(!map.has(key))map.set(key,{dates:[],visits:d.visits?d.visits.map(v=>({...v,minutes:v.minutes===null?'':String(v.minutes)})):[]});map.get(key).dates.push(d.date);}importGroups=[...map.values()];
+  // Suggest a duration on first import only. A saved blank is an explicit pending decision.
+  if(!draft.originalDays){
+   for(const group of importGroups)for(const visit of group.visits){
+    if(visit.service&&!visit.minutes)visit.minutes=standardMinutes(visit.service);
+   }
+  }
+ }
  const stash=()=>{if(draft){importGroups[importIndex]={dates:[...selected].sort(),visits:structuredClone(visits)};}};
- const loadGroup=i=>{importIndex=i;const g=importGroups[i];selected=new Set(g.dates);visits=structuredClone(g.visits);const a=g.dates[0];if(a)month=new Date(Number(a.slice(0,4)),Number(a.slice(5,7))-1,1);for(const v of visits){if(v.service&&!v.minutes)v.minutes=standardMinutes(v.service);}};
+ const loadGroup=i=>{importIndex=i;const g=importGroups[i];selected=new Set(g.dates);visits=structuredClone(g.visits);const a=g.dates[0];if(a)month=new Date(Number(a.slice(0,4)),Number(a.slice(5,7))-1,1);};
  if(draft)loadGroup(0);
  const el=(tag,t,cl)=>{const n=document.createElement(tag);if(t)n.textContent=t;if(cl)n.className=cl;return n;};
  const line=()=>el('div','','row');
