@@ -30,7 +30,7 @@ function careText(kind,o){
   }
   case 'water':{
    const source=o.source&&(/^(水源|備水|使用|取用|從|請|用|不|勿|先|以)/.test(o.source)?o.source:'水源為'+o.source);
-   lines=[o.place,together(source,o.care),detail];break;
+   lines=[o.place,o.source?.trim()==='客廳水桶'&&o.care?.trim()==='換水'?'使用客廳水桶的水進行換水':(o.source&&o.care?.trim()==='換水'&&!/^(水源|備水|使用|取用|從|請|用|不|勿|先|以)/.test(o.source)?'使用'+o.source+'的水進行換水':together(source,o.care)),detail];break;
   }
   case 'toilet':
    lines=[together(o.place,o.spare&&'備品在'+o.spare),o.waste&&!routineWaste(o.waste)&&'• 垃圾處理　'+o.waste,
@@ -81,7 +81,11 @@ export async function buildPDF(f,brand=brandDefaults){
   for(const paragraph of String(value).split(/\r?\n/)){
    let row='';
    for(const ch of paragraph){
-    if(row && ctx.measureText(row+ch).width>width){out.push(row);row='';}
+    if(row && ctx.measureText(row+ch).width>width){
+     if(/^[，。！？、；：）】」』》…,.!?;:)]$/.test(ch)&&row.length>1){const tail=Array.from(row).pop();out.push(row.slice(0,-tail.length));row=tail;}
+     else if(/[（【「『《(]$/.test(row)&&row.length>1){out.push(row.slice(0,-1));row=row.slice(-1);}
+     else{out.push(row);row='';}
+    }
     row+=ch;
    }
    out.push(row);
@@ -192,7 +196,7 @@ export async function buildPDF(f,brand=brandDefaults){
  const care=careBlocks(f);
  const basics=[
   ['陪伴毛孩的時間與細節',clean([f.booking.dates,f.booking.times,...f.booking.services.map(s=>serviceName(s,f.groups))])],
-  ['回家的方式與門鎖安全',clean([f.entry.pickup&&'• 取鑰匙　'+f.entry.pickup,f.entry.door,f.entry.return&&'• 還鑰匙　'+f.entry.return])],
+  ['回家的方式與門鎖安全',clean([f.entry.pickup&&(/^(已取|已取得)$/.test(f.entry.pickup.trim())?'鑰匙已取得。':'取鑰匙：'+f.entry.pickup),f.entry.door,f.entry.return&&(/^(最後一趟放門內|最後一趟放回門內)$/.test(f.entry.return.trim())?'最後一趟將鑰匙放回門內。':'還鑰匙：'+f.entry.return)])],
   ['身體小狀況與特別照顧',care.filter(b=>b.id.endsWith('-health')).flatMap(b=>[b.title,...careText('health',f.groups[b.id.split('-')[0]].health)])]
  ].filter(([,ls])=>ls.length);
  rows(basics,3);
