@@ -148,3 +148,14 @@ dialog.family-filter-dialog[open]{display:flex;flex-direction:column}
 .filter-footer-actions{display:grid;grid-template-columns:1fr 2fr;gap:8px}
 .filter-footer-actions button{font-size:14px;min-height:44px}
 @media(max-width:620px){dialog.family-filter-dialog{position:fixed;top:auto;bottom:0;left:0;right:0;margin:0;width:100%;max-height:90dvh;border-radius:22px 22px 0 0}.family-searchbar{margin-top:12px}.filter-body{padding-inline:18px}}
+
+.family-list-tools{display:flex;align-items:center;gap:4px}
+#upcomingFamilies{display:inline-flex;align-items:center;gap:4px;font-size:12px;min-height:30px;padding:3px 7px;border-radius:8px;color:#766581;background:#fff}
+#upcomingFamilies.filter-active{background:#eee7f4;border-color:#b9a7c9;color:#6b557c}
+#upcomingFamilies[hidden],#recentFamilySearch[hidden]{display:none!important}
+#families .upcoming-family-tag{display:block;margin-top:5px;font-size:12px;font-weight:650;color:#766185}
+#recentFamilySearch{margin:0 0 10px;padding:7px 0 9px;border-bottom:1px solid #e9e4ed}
+.recent-family-head{display:flex;justify-content:space-between;align-items:center;color:#817888;font-size:12px;margin-bottom:4px}
+#clearRecentFamilySearch{font-size:12px;padding:1px 4px;min-height:24px;background:transparent;border:0}
+#recentFamilyItems{display:flex;gap:5px;overflow-x:auto;scrollbar-width:thin;padding-bottom:3px}
+#recentFamilyItems .recent-family-chip{flex:none;font-size:12px;min-height:34px;padding:5px 9px;border-radius:9px;background:#f3eff7;max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

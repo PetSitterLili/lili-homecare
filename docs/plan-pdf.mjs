@@ -1,6 +1,6 @@
-import {quoteLines,overtimeText} from './quote.mjs?v=2.0.1126.29';
-import {activeFamily,filename,careBlocks,serviceName,bookingLines} from './workspace-model.mjs?v=2.0.1126.29';
-import {brandDefaults,links,palette} from './brand.mjs?v=2.0.1126.29';
+import {quoteLines,overtimeText} from './quote.mjs?v=2.0.1126.30';
+import {activeFamily,filename,careBlocks,serviceName,bookingLines} from './workspace-model.mjs?v=2.0.1126.30';
+import {brandDefaults,links,palette} from './brand.mjs?v=2.0.1126.30';
 const W=794,H=1123,M=38,B=1060,inner=W-2*M;
 const clean=values=>values.filter(x=>typeof x==='string'&&x.trim());
 const sentence=value=>/[。！？.!?]$/.test(value.trim())?value.trim():value.trim()+'。';
