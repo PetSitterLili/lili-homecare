@@ -1,1 +1,1 @@
-{"name":"ㄌㄌ保姆｜家訪與照護","short_name":"ㄌㄌ照護","lang":"zh-Hant","start_url":"./","scope":"./","display":"standalone","theme_color":"#786b86","background_color":"#faf9fc","icons":[{"src":"assets/icon-192.png","sizes":"192x192","type":"image/png"},{"src":"assets/icon-512.png","sizes":"512x512","type":"image/png"}]}
+{"name":"ㄌㄌ保姆 | CRM系統","short_name":"ㄌㄌ保姆 | CRM系統","lang":"zh-Hant","start_url":"./","scope":"./","display":"standalone","theme_color":"#786b86","background_color":"#faf9fc","icons":[{"src":"assets/crm-black-cat.svg","sizes":"any","type":"image/svg+xml","purpose":"any"}]}

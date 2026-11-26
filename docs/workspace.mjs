@@ -1,11 +1,11 @@
-import {rememberGrant,recallGrant,forgetGrant} from './tab-grant.mjs?v=2.0.1126.8';
-import {brandDefaults,readBrand} from './brand.mjs?v=2.0.1126.8';
+import {rememberGrant,recallGrant,forgetGrant} from './tab-grant.mjs?v=2.0.1126.9';
+import {brandDefaults,readBrand} from './brand.mjs?v=2.0.1126.9';
 
-import {serviceName,fresh,blanks,fields,titles,day,filename,mediaLabel,warnings,publicBlocks,tasks,sourceKey,normalize,migrate} from './workspace-model.mjs?v=2.0.1126.8';
-import {makeText as legacyText} from './model.mjs?v=2.0.1126.8';
-import {DriveStore,digest} from './drive.mjs?v=2.0.1126.8';
-import {openDB,storeDB} from './drafts.mjs?v=2.0.1126.8';
-import {buildPDF} from './plan-pdf.mjs?v=2.0.1126.8';
+import {serviceName,fresh,blanks,fields,titles,day,filename,mediaLabel,warnings,publicBlocks,tasks,sourceKey,normalize,migrate} from './workspace-model.mjs?v=2.0.1126.9';
+import {makeText as legacyText} from './model.mjs?v=2.0.1126.9';
+import {DriveStore,digest} from './drive.mjs?v=2.0.1126.9';
+import {openDB,storeDB} from './drafts.mjs?v=2.0.1126.9';
+import {buildPDF} from './plan-pdf.mjs?v=2.0.1126.9';
 const $=id=>document.getElementById(id),drive=new DriveStore(),db=storeDB(await openDB().catch(error=>{$('main').innerHTML='<div class="panel"><h1>目前無法啟用草稿保存</h1><p>此瀏覽器未能開啟本機資料庫，請換外部瀏覽器或檢查儲存空間；尚未開放填寫，避免資料遺失。</p></div>';throw error;}));
 let records=await db.all(),entry=null,view='service',kind='cat',petIndex=0,undo=[],syncTimer,localChain=Promise.resolve(),syncBusy=false,photoBusy=false,pdf=null,photoUrl=null,localFailure=false;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
