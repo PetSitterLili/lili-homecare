@@ -1,6 +1,6 @@
-import {quoteLines,overtimeText} from './quote.mjs?v=2.0.1126.13';
-import {filename,careBlocks,serviceName,bookingLines} from './workspace-model.mjs?v=2.0.1126.13';
-import {brandDefaults,links,palette} from './brand.mjs?v=2.0.1126.13';
+import {quoteLines,overtimeText} from './quote.mjs?v=2.0.1126.14';
+import {activeFamily,filename,careBlocks,serviceName,bookingLines} from './workspace-model.mjs?v=2.0.1126.14';
+import {brandDefaults,links,palette} from './brand.mjs?v=2.0.1126.14';
 const W=794,H=1123,M=38,B=1060,inner=W-2*M;
 const clean=values=>values.filter(x=>typeof x==='string'&&x.trim());
 const sentence=value=>/[。！？.!?]$/.test(value.trim())?value.trim():value.trim()+'。';
@@ -67,6 +67,7 @@ const sans='"Noto Sans CJK TC", "Noto Color Emoji", system-ui, sans-serif';
 const lineHeight=23;
 
 export async function buildPDF(f,brand=brandDefaults){
+ f=activeFamily(f);
  await document.fonts.load('700 18px "Lili Serif"','毛孩專屬照護計畫書');
  await document.fonts.ready;
  const [cat,ig,line]=await Promise.all(['cat','ig','line'].map(art));

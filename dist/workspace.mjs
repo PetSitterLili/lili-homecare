@@ -1,12 +1,12 @@
-import {rememberGrant,recallGrant,forgetGrant} from './tab-grant.mjs?v=2.0.1126.13';
-import {mixedPlan,mixedCare,mixedService,defaultRates,readRates,days,travel,rate,holidayRows,quoteKey,savedQuote,quoteLines,money,overtimeText} from './quote.mjs?v=2.0.1126.13';
-import {brandDefaults,readBrand} from './brand.mjs?v=2.0.1126.13';
+import {rememberGrant,recallGrant,forgetGrant} from './tab-grant.mjs?v=2.0.1126.14';
+import {mixedPlan,mixedCare,mixedService,defaultRates,readRates,days,travel,rate,holidayRows,quoteKey,savedQuote,quoteLines,money,overtimeText} from './quote.mjs?v=2.0.1126.14';
+import {brandDefaults,readBrand} from './brand.mjs?v=2.0.1126.14';
 
-import {bookingSegments,bookingLines,serviceName,fresh,blanks,fields,titles,day,filename,mediaLabel,warnings,publicBlocks,tasks,sourceKey,normalize,migrate} from './workspace-model.mjs?v=2.0.1126.13';
-import {makeText as legacyText} from './model.mjs?v=2.0.1126.13';
-import {DriveStore,digest} from './drive.mjs?v=2.0.1126.13';
-import {openDB,storeDB} from './drafts.mjs?v=2.0.1126.13';
-import {buildPDF} from './plan-pdf.mjs?v=2.0.1126.13';
+import {noteSpecs,noteRows,writeNoteRows,noteCycle,noteActive,bindPendingNotes,activeFamily,bookingSegments,bookingLines,serviceName,fresh,blanks,fields,titles,day,filename,mediaLabel,warnings,publicBlocks,tasks,sourceKey,normalize,migrate} from './workspace-model.mjs?v=2.0.1126.14';
+import {makeText as legacyText} from './model.mjs?v=2.0.1126.14';
+import {DriveStore,digest} from './drive.mjs?v=2.0.1126.14';
+import {openDB,storeDB} from './drafts.mjs?v=2.0.1126.14';
+import {buildPDF} from './plan-pdf.mjs?v=2.0.1126.14';
 const $=id=>document.getElementById(id),drive=new DriveStore(),db=storeDB(await openDB().catch(error=>{$('main').innerHTML='<div class="panel"><h1>目前無法啟用草稿保存</h1><p>此瀏覽器未能開啟本機資料庫，請換外部瀏覽器或檢查儲存空間；尚未開放填寫，避免資料遺失。</p></div>';throw error;}));
 let records=await db.all(),entry=null,view='service',kind='cat',petIndex=0,undo=[],syncTimer,localChain=Promise.resolve(),syncBusy=false,photoBusy=false,pdf=null,photoUrl=null,localFailure=false;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -43,15 +43,66 @@ async function openRecord(id){await localChain;entry=records.find(r=>r.id===id);
 async function newRecord(demo=false){archiveView=false;$('archive').textContent='已刪除家庭';if(photoBusy){toast('請等待照片保存完成');return;}const f=fresh();if(demo){f.name='姆姆家四貓（操作範例）';f.groups.cat.pets=[{name:'姆姆',identity:'白底虎斑',personality:'慢熟，依他的步調靠近'}];f.groups.cat.food.dry={item:'範例飼料',amount:'三分之一',unit:'杯',location:'廚房右側下櫃',leftover:'移出洗碗後放回'};}const r={id:f.id,f,remote:null,rev:1,syncedRev:0};records.push(r);await persist(r);await openRecord(r.id);view='edit';render();}
 function button(text,fn,cl=''){const b=document.createElement('button');b.type='button';b.textContent=text;b.className=cl;b.onclick=fn;return b;}
 function heading(text){const h=document.createElement('h3');h.textContent=text;return h;}
-function field(obj,key,label,{long=false,options=null,compact=false,placeholder=''}={}){const wrap=document.createElement('div');wrap.className='field'+(compact?' compact':'');const head=document.createElement('div');head.className='fieldhead';const l=document.createElement('span');l.textContent=label;head.append(l,button('清除',async()=>{if(!obj[key])return;if(await confirmAction('清除此欄？','只清除「'+label+'」，其他資料不變。','確認清除')){snapshot();obj[key]='';dirty();input.value='';}},'clear'));let input=document.createElement(options?'select':long?'textarea':'input');input.setAttribute('aria-label',label);input.placeholder=placeholder;
+function field(obj,key,label,{long=false,options=null,compact=false,placeholder=''}={}){const spec=!options&&entry&&noteSpecs(entry.f).find(s=>s.obj===obj&&s.key===key);if(spec)return careNoteField(spec,label,placeholder);const wrap=document.createElement('div');wrap.className='field'+(compact?' compact':'');const head=document.createElement('div');head.className='fieldhead';const l=document.createElement('span');l.textContent=label;head.append(l,button('清除',async()=>{if(!obj[key])return;if(await confirmAction('清除此欄？','只清除「'+label+'」，其他資料不變。','確認清除')){snapshot();obj[key]='';dirty();input.value='';}},'clear'));let input=document.createElement(options?'select':long?'textarea':'input');input.setAttribute('aria-label',label);input.placeholder=placeholder;
 if(options){const values=['',...new Set([...options,...(obj[key]&&!options.includes(obj[key])?[obj[key]]:[])])];for(const v of values){const o=document.createElement('option');o.value=v;o.textContent=v||'尚未確認';input.append(o);}input.onchange=()=>{snapshot();obj[key]=input.value;dirty();};}else input.oninput=()=>{snapshot();obj[key]=input.value;dirty();};input.value=obj[key]||'';wrap.append(head,input);return wrap;}
+
+function careNoteField(spec,label,placeholder){
+ const f=entry.f,wrap=document.createElement('div');wrap.className='field care-note-field';
+ const head=document.createElement('div');head.className='fieldhead';const title=document.createElement('span');title.textContent=label;head.append(title);wrap.append(head);
+ const list=document.createElement('div');list.className='care-note-list';wrap.append(list);
+ let rows=noteRows(spec);
+ // An empty initial row is only persisted if the user interacts with it.
+ const blank=()=>({id:crypto.randomUUID(),text:'',flag:spec.flag,temp:false,cycle:'',closed:false});
+ if(!rows.length)rows=[blank()];
+ const save=()=>{writeNoteRows(spec,rows);dirty();};
+ const resize=t=>{t.style.height='auto';t.style.height=Math.max(t.scrollHeight+2,44)+'px';};
+ const draw=focus=>{
+  list.replaceChildren();
+  for(const n of rows){
+   const line=document.createElement('div');line.className='care-note-row';
+   const body=document.createElement('div');body.className='care-note-body';
+   const input=document.createElement('textarea');input.rows=1;input.value=n.text;input.placeholder=placeholder||'輸入一項交代';input.setAttribute('aria-label',label);body.append(input);
+   const state=document.createElement('small');state.className='care-note-state';body.append(state);
+   const actions=document.createElement('div');actions.className='care-note-actions';
+   const flagGroup=document.createElement('div');flagGroup.className='care-note-flag-group';
+   const flag=button('',()=>{snapshot();n.flag=!n.flag;save();paint();},'care-note-flag');
+   const flagIcon=document.createElementNS('http://www.w3.org/2000/svg','svg');flagIcon.setAttribute('viewBox','0 0 28 28');flagIcon.setAttribute('aria-hidden','true');
+   flagIcon.innerHTML='<path d="M6 25V4 M6 5C12 0 17 10 23 4V17C17 23 12 12 6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><g class="care-note-clock"><circle cx="21" cy="21" r="6.5" fill="#F8F5EE" stroke="currentColor" stroke-width="1.3"/><path d="M21 17V21L24 22" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></g>';
+   flag.append(flagIcon);
+   const arrow=button('⌄',()=>toggleMenu(),'care-note-arrow');arrow.setAttribute('aria-label','旗標與有效期限');
+   const menu=document.createElement('div');menu.className='care-note-menu';menu.hidden=true;
+   const toggleMenu=()=>{const open=menu.hidden;wrap.querySelectorAll('.care-note-menu').forEach(e=>e.hidden=true);menu.hidden=!open;arrow.setAttribute('aria-expanded',String(open));};
+   const options=[['不加入小卡',false,false],['長期複核',true,false],['僅限本期複核',true,true],['僅限本期備註',false,true]];
+   for(const [caption,flagged,temp] of options){menu.append(button(caption,()=>{snapshot();Object.assign(n,{flag:flagged,temp,cycle:temp?noteCycle(f):'',closed:false});save();menu.hidden=true;arrow.setAttribute('aria-expanded','false');paint();}));}
+   const end=button('結束本期事項（保留歷史）',()=>{snapshot();n.closed=true;save();menu.hidden=true;arrow.setAttribute('aria-expanded','false');paint();});menu.append(end);
+   let timer=null,longPress=false;
+   flag.addEventListener('pointerdown',()=>{longPress=false;timer=setTimeout(()=>{longPress=true;toggleMenu();},480);});
+   const stop=()=>clearTimeout(timer);for(const event of ['pointerup','pointercancel','pointerleave'])flag.addEventListener(event,stop);
+   flag.addEventListener('contextmenu',e=>e.preventDefault());flag.addEventListener('click',e=>{if(longPress){longPress=false;e.preventDefault();e.stopImmediatePropagation();}},true);
+   flagGroup.append(flag,arrow,menu);actions.append(flagGroup);
+   const remove=button('×',async()=>{if(n.text.trim()&&!await confirmAction('刪除此項備註？','只移除這一項，不影響其他交代。','確認刪除'))return;snapshot();rows=rows.filter(r=>r.id!==n.id);if(!rows.length)rows=[blank()];save();draw();},'care-note-remove');remove.setAttribute('aria-label','刪除此項備註');actions.append(remove);
+   function paint(){
+    const active=noteActive(f,n);
+    flagGroup.dataset.flag=n.flag?'yes':'no';flagGroup.dataset.temp=n.temp?'yes':'no';
+    flag.setAttribute('aria-pressed',String(n.flag));flag.setAttribute('aria-label',n.flag?'取消加入照護小卡':'加入照護小卡');flag.title=n.flag?'取消旗標':'加入小卡';
+    state.textContent=n.closed?'已結束・保留歷史':!active?'上期事項・待重新確認':n.temp?'僅限本期': '';
+    state.hidden=!state.textContent;line.classList.toggle('care-note-expired',!active);end.hidden=!n.temp||n.closed;
+    for(let i=0;i<options.length;i++){const [,v,t]=options[i];menu.children[i].classList.toggle('active',!n.closed&&active&&v===n.flag&&t===n.temp);}
+   }
+   input.oninput=()=>{snapshot();n.text=input.value;save();resize(input);};
+   line.append(body,actions);list.append(line);paint();requestAnimationFrame(()=>{resize(input);if(focus===n.id)input.focus();});
+  }
+ };
+ const add=button('＋ 新增備註',()=>{const n=blank();rows.push(n);draw(n.id);},'care-note-add');wrap.append(add);draw();return wrap;
+}
+
 function check(label,checked,fn){const l=document.createElement('label');l.className='check';const i=document.createElement('input');i.type='checkbox';i.checked=checked;i.onchange=()=>fn(i.checked);l.append(i,document.createTextNode(label));return l;}
 function grid(){const e=document.createElement('div');e.className='grid';return e;}
 function section(title,open=true){const e=document.createElement('details');e.open=open;const s=document.createElement('summary');s.textContent=title;const body=document.createElement('div');body.className='body';e.append(s,body);return {e,body};}
 function quantity(o){const w=document.createElement('div');w.className='field';const h=document.createElement('div');h.className='fieldhead';h.textContent='每次份量';const row=document.createElement('div');row.className='amount';for(const [key,ph]of[['amount','三分之一'],['unit','杯']]){const input=document.createElement('input');input.value=o[key]||'';input.placeholder=ph;input.setAttribute('aria-label',key==='amount'?'份量':'份量單位');input.oninput=()=>{snapshot();o[key]=input.value;dirty();};const container=document.createElement('div');container.append(input,button('清除',async()=>{if(o[key]&&await confirmAction('清除這一格？','只清除'+(key==='amount'?'份量':'單位')+'，不影響其他資料。','確認清除')){snapshot();o[key]='';input.value='';dirty();}},'clear'));row.append(container);}w.append(h,row);return w;}
 function showConsent(){
  const el=$('mediaBadge');if(!el||!entry)return;
- const media=entry.f.media;
+ const media=activeFamily(entry.f).media;
  el.dataset.consent=media.status;
  const label=document.createElement('span');label.textContent='服務影像對外分享';
  const state=document.createElement('strong');state.textContent=({yes:'我願意分享',no:'我不願意分享'})[media.status]||'尚未確認';
@@ -107,9 +158,9 @@ s=section('進出、WiFi 與環境',false);g=grid();for(const[k,l]of[['pickup','
 const review=document.createElement('div');review.className='panel';review.append(heading('填完後，快速確認'));review.append(button('檢查還有沒有需要補問的資料',()=>{review.querySelectorAll('.issue').forEach(e=>e.remove());const w=warnings(f);if(!w.length){const p=document.createElement('p');p.textContent='目前沒有偵測到關鍵缺漏，仍請依家訪確認內容為準。';review.append(p);}for(const text of w){const p=document.createElement('div');p.className='issue';p.textContent=text;review.append(p);}}));content.append(review);}
 function renderService(content){const f=entry.f;const p=document.createElement('div');p.className='panel';p.append(heading('本次照護'));const desc=document.createElement('p');desc.textContent=bookingLines(f.booking,f.groups).join('\n')||'先到編輯家訪資料填寫本次預約。';desc.style.whiteSpace='pre-line';p.append(desc);const issues=warnings(f);for(const t of issues){const el=document.createElement('div');el.className='issue';el.textContent=t;p.append(el);}content.append(p);
 const run=f.runs.at(-1);content.append(button(run?'建立下一趟勾選':'建立本趟照護小卡',async()=>{const warn=warnings(f);if(warn.length&&!await confirmAction('還有資料待確認','目前有 '+warn.length+' 項待確認。仍可建立小卡，現場請勿自行推測缺漏指示。','仍建立小卡'))return;const d=day();snapshot();f.runs.push({id:crypto.randomUUID(),label:d.year+'/'+d.month+'/'+d.day+' 第 '+(f.runs.length+1)+' 趟',createdAt:new Date().toISOString(),source:sourceKey(f),tasks:tasks(f),checks:{}});dirty();render();},'primary'));
-if(!run){const q=document.createElement('p');q.className='muted';q.textContent='小卡由最新主資料產生，勾選記錄按趟保留。';content.append(q);return;}
+if(!run){const q=document.createElement('p');q.className='muted';q.textContent='離場前複核小卡只顯示已插旗的個別交代，勾選記錄按趟保留。';content.append(q);return;}
 const head=document.createElement('div');head.className='panel';head.append(heading(run.label));const stale=run.source!==sourceKey(f);if(stale){const el=document.createElement('div');el.className='issue';el.textContent='主資料已修改，這張小卡需要更新。已完成勾選不會套用到新的指示。';head.append(el,button('依最新資料更新本趟小卡',async()=>{if(await confirmAction('更新本趟小卡？','本趟原始小卡會保留為上一筆記錄，另建更新版；勾選從頭確認。','建立更新版')){snapshot();f.runs.push({id:crypto.randomUUID(),label:run.label+'（更新）',createdAt:new Date().toISOString(),source:sourceKey(f),tasks:tasks(f),checks:{}});dirty();render();}}));}
-for(const t of run.tasks){const l=document.createElement('label');l.className='task'+(run.checks[t.id]?' done':'');const c=document.createElement('input');c.type='checkbox';c.checked=!!run.checks[t.id];c.onchange=()=>{snapshot();run.checks[t.id]=c.checked;dirty();l.classList.toggle('done',c.checked);};const body=document.createElement('div');const title=document.createElement('strong');title.textContent=t.title;const detail=document.createElement('p');detail.textContent=t.detail;body.append(title,detail);l.append(c,body);head.append(l);}content.append(head);
+if(!run.tasks.length){const empty=document.createElement('p');empty.className='muted';empty.textContent='本趟無特殊複核事項。';head.append(empty);}for(const t of run.tasks){const l=document.createElement('label');l.className='task'+(run.checks[t.id]?' done':'');const c=document.createElement('input');c.type='checkbox';c.checked=!!run.checks[t.id];c.onchange=()=>{snapshot();run.checks[t.id]=c.checked;dirty();l.classList.toggle('done',c.checked);};const body=document.createElement('div');const title=document.createElement('strong');title.textContent=t.title;const detail=document.createElement('p');detail.textContent=t.detail;body.append(title,detail);l.append(c,body);head.append(l);}content.append(head);
 if(f.runs.length>1){const old=section('先前趟次記錄',false);for(const r of f.runs.slice(0,-1).reverse()){const d=document.createElement('div');d.className='panel';d.append(heading(r.label));for(const t of r.tasks){const q=document.createElement('p');q.textContent=(r.checks[t.id]?'已完成 · ':'未勾選 · ')+t.title;d.append(q);}old.body.append(d);}content.append(old.e);}}
 async function photoBlob(p){
  const local=await db.get('photos',p.id);if(local)return local;
@@ -195,7 +246,7 @@ function bookingEditor(b,groups){
  let visits=[blank()];
  const el=(tag,t,cl)=>{const n=document.createElement(tag);if(t)n.textContent=t;if(cl)n.className=cl;return n;};
  const line=()=>el('div','','row');
- const save=rs=>{snapshot();b.segments=rs.map(r=>JSON.stringify(r));if(rs.length){b.services=[...new Set(rs.flatMap(r=>r.visits.map(v=>v.service)))];}else if(!b.dates&&!b.times)b.services=[];dirty();if(modal.open)modal.close();render();};
+ const save=rs=>{snapshot();b.segments=rs.map(r=>JSON.stringify(r));if(rs.length){b.services=[...new Set(rs.flatMap(r=>r.visits.map(v=>v.service)))];}else if(!b.dates&&!b.times)b.services=[];bindPendingNotes(entry.f);dirty();if(modal.open)modal.close();render();};
  const wheel=(v,key)=>{const w=el('div','','booking-wheel');const val=v[key]||'';let h=val?Number(val.slice(0,2)):null,m=val?Number(val.slice(3)):null;const sync=()=>{v[key]=h===null||m===null?'':String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');};for(const [values,get,set,label] of [[Array.from({length:24},(_,i)=>i),()=>h,x=>{h=x;sync();},'小時'],[[0,15,30,45],()=>m,x=>{m=x;sync();},'分鐘']]){const sc=el('div','','booking-scroll');sc.setAttribute('aria-label',label);const choices=[null,...values];for(const x of choices){const item=el('button',x===null?'—':String(x).padStart(2,'0'));item.type='button';item.onclick=()=>{sc.scrollTop=choices.indexOf(x)*32;set(x);};sc.append(item);}w.append(sc);let timer;sc.addEventListener('scroll',()=>{clearTimeout(timer);timer=setTimeout(()=>{set(choices[Math.max(0,Math.min(choices.length-1,Math.round(sc.scrollTop/32)))]);},100);});requestAnimationFrame(()=>{sc.scrollTop=Math.max(0,choices.indexOf(get()))*32;});}return w;};
  const modal=crmDialog('新增／編輯預約',root);function draw(){root.replaceChildren();const nav=line();nav.append(button('‹',()=>{month.setMonth(month.getMonth()-1);draw();}),el('strong',month.getFullYear()+' 年 '+(month.getMonth()+1)+' 月'),button('›',()=>{month.setMonth(month.getMonth()+1);draw();}));root.append(nav);const cal=el('div','','booking-calendar');for(const d of ['日','一','二','三','四','五','六'])cal.append(el('small',d));for(let i=0;i<month.getDay();i++)cal.append(el('span'));for(let d=1;d<=new Date(month.getFullYear(),month.getMonth()+1,0).getDate();d++){const iso=month.getFullYear()+'-'+String(month.getMonth()+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');cal.append(button(String(d),()=>{if(!a||z){a=iso;z='';}else{z=iso;if(z<a)[a,z]=[z,a];}draw();},iso===a||iso===z?'active':a&&z&&iso>a&&iso<z?'booking-between':''));}root.append(cal,el('p',a?(z?a+(a===z?'':' ～ '+z):a+'｜請選結束日期'):'選擇開始及結束日期，單日點兩次','muted'),el('strong','每日出勤次數'));const counts=line();for(let n=1;n<=4;n++)counts.append(button(n+' 次',()=>{while(visits.length<n)visits.push(blank());visits=visits.slice(0,n);draw();},visits.length===n?'active':''));root.append(counts);
  visits.forEach((v,i)=>{const card=el('div','','booking-visit');const top=line();top.append(el('strong','第 '+(i+1)+' 趟'));if(i)top.append(button('同第一趟方案',()=>{v.service=visits[0].service;v.minutes=visits[0].minutes;draw();}));card.append(top,el('small','預計抵達時段（選填）'));const times=line();for(const [key,label] of [['start','開始'],['end','結束']]){const part=el('div','','booking-time');part.append(el('small',label),wheel(v,key));times.append(part);}card.append(times);const note=el('input');note.placeholder='補充說明（選填）';note.value=v.note;note.oninput=()=>v.note=note.value;card.append(note,el('small','服務方案'));const options=line();for(const s of services)options.append(button(s,()=>{v.service=s;draw();},v.service===s||mixed&&mixedService(v.service)?'active':''));if(mixed)options.append(el('small',mixedCare));card.append(options,el('small','服務時間'));const mins=line();for(const m of ['30','40','45','50','60','70','75','80','90','120','180'])mins.append(button(m+' 分',()=>{v.minutes=m;draw();},v.minutes===m?'active':''));card.append(mins);const custom=crmInput(card,'自訂服務分鐘（選填）',v.minutes);custom.min='1';custom.max='720';custom.oninput=()=>v.minutes=custom.value;root.append(card);});
