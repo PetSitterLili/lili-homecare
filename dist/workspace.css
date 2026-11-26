@@ -168,4 +168,6 @@ dialog.family-filter-dialog[open]{display:flex;flex-direction:column}
 .filehead{position:relative;padding-right:48px!important}.filehead .family-card-more{position:absolute;right:3px;top:3px;margin:0}
 
 /* Independent family follow-up flag; does not replace risk colours. */
-#families .family-card-more[data-pending-action=true],.filehead .family-card-more[data-pending-action=true],.family-pending-toggle[data-pending-action=true]{background:#ded2ec;border-color:#b7a0d0;color:#604779;font-weight:700}#families .family-card-more[data-pending-action=true]:hover,.filehead .family-card-more[data-pending-action=true]:hover{background:#d4c3e7;border-color:#a78dc3}.family-pending-box{border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:14px}.family-pending-box p{margin:0 0 6px}.family-pending-toggle{width:100%}
+.family-pending-toggle[data-pending-action=true]{background:#fff0df;border-color:#e5bf99;color:#91613b;font-weight:700}.family-pending-box{border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:14px}.family-pending-box p{margin:0 0 6px}.family-pending-toggle{width:100%}
+
+#families .family-card-open[data-pending-action=true]{background:#fff0df;border-color:#e8c39f}#families .family-card-open[data-pending-action=true]:hover{background:#fbe7d1}#families .family-card-open[data-pending-action=true][data-risk=blacklist]{border-color:#ce8a91}#families .family-card-open[data-pending-action=true][data-risk=watch]{border-color:#d6b57c}#families .pending-action-tag{color:#91613b;font-weight:700}
