@@ -1,5 +1,5 @@
-import {filename,careBlocks} from './workspace-model.mjs?v=2.0.1126.3';
-import {brandDefaults,links} from './brand.mjs?v=2.0.1126.3';
+import {filename,careBlocks,serviceName} from './workspace-model.mjs?v=2.0.1126.4';
+import {brandDefaults,links,palette} from './brand.mjs?v=2.0.1126.4';
 const W=794,H=1123,M=38,B=1060,inner=W-2*M;
 const clean=values=>values.filter(x=>typeof x==='string'&&x.trim());
 const sentence=value=>/[。！？.!?]$/.test(value.trim())?value.trim():value.trim()+'。';
@@ -7,30 +7,43 @@ const petStory=p=>{
  const identity=clean([p.age,p.identity,p.sex]).join('');
  return clean([identity,p.neuter,p.health,p.personality,p.likes,p.avoid,p.area&&'常在'+p.area,p.intro]).map(sentence).join('');
 };
-// Change only the surrounding language. Quantities and instructions stay verbatim.
-function natural(line){
- const split=line.indexOf('：');
- if(split<0)return line;
- const label=line.slice(0,split),value=line.slice(split+1);
- if(!value)return '';
- switch(label){
-  case '份量':return sentence('每次給予'+value);
-  case '備品位置':return sentence('📍備品在'+value);
-  case '剩食處理':return value==='移出洗碗後放回'?'如有剩食，先移出，清洗碗具後再放回。':sentence('如有剩食，'+value);
-  case '混糧':return '• 混糧搭配　'+value;
-  case '水源與備水位置':return /水/.test(value)?sentence(value):'• 水源　'+value;
-  case '玩具與位置':return /玩具|球|棒|繩|偶|娃娃/.test(value)?sentence(value):'• 玩具　'+value;
-  case '牽繩、胸背與便袋位置':return /牽繩|胸背|便袋/.test(value)?sentence(value):'• 散步用品　'+value;
-  case '返家用品位置／特殊交代':return '• 返家後　'+value;
-  case '廢棄物處理':return '• 垃圾處理　'+value;
-  case '返家整理':return sentence('返家後需整理'+value);
-  case '時間／路線':return sentence(value);
-  case '健康與處置確認':return sentence(value);
-  case '對象、藥品、份量、時段與操作／觀察事項':return '• 照護指示　'+value;
-  case '安全與雨天交代':case '禁忌／特殊交代':return '• '+value;
-  // When the input itself describes the action, its original wording reads most clearly.
-  default:return sentence(value);
+// Keep free-form directions intact. Join only fields with a known relationship.
+function together(...parts){
+ return clean(parts).map(s=>s.trim()).reduce((text,next)=>
+  text+(text&&!/[。！？.!?，、；：\n]$/.test(text)?'，':'')+next,'');
+}
+const routineWaste=value=>/^(?:每趟|每次|每次到府)?(?:由)?(?:ㄌㄌ|保姆)(?:會)?(?:將垃圾|把垃圾)?帶走(?:垃圾)?[。！.]?$/.test(value?.trim());
+function careText(kind,o){
+ if(o.enabled===false)return ['本次不提供'];
+ const detail=clean([o.note])[0];
+ const mark=(phrase)=>phrase&&'• '+phrase;
+ const location=value=>value&&'📍備品在'+value;
+ let lines=[];
+ switch(kind){
+  case 'dry':case 'wet':case 'snack':{
+   const portion=clean([o.amount,o.unit]).join('');
+   lines=[together(o.item,portion&&'每次給予'+portion),o.water,location(o.location)];
+   if(o.leftover)lines.push(o.leftover==='移出洗碗後放回'?'如有剩食，先移出，清洗碗具後再放回':'如有剩食，'+o.leftover);
+   if(detail)lines.push(kind==='snack'?mark(detail):detail);
+   if(o.mix){const ratio=together(o.mixItem,o.mixAmount);lines.push(ratio?'混糧搭配為'+ratio:'需要混糧');}
+   break;
+  }
+  case 'water':{
+   const source=o.source&&(/^(水源|備水|使用|取用|從|請|用|不|勿|先|以)/.test(o.source)?o.source:'水源為'+o.source);
+   lines=[o.place,together(source,o.care),detail];break;
+  }
+  case 'toilet':
+   lines=[together(o.place,o.spare&&'備品在'+o.spare),o.waste&&!routineWaste(o.waste)&&'• 垃圾處理　'+o.waste,
+    o.usual&&'平常如廁情形為'+o.usual,detail];break;
+  case 'play':
+   lines=[together(o.likes,o.toys&&(/玩具|球|棒|繩|娃娃/.test(o.toys)?o.toys:'玩具安排為'+o.toys)),detail];break;
+  case 'walk':
+   lines=[o.time,o.tools&&'• 散步用品　'+o.tools,mark(detail),
+    together(o.parts?.length&&'返家後需整理'+o.parts.join('、'),o.returnNote)];break;
+  case 'health':lines=[o.status,mark(detail)];break;
+  case 'wash':return washLines(o);
  }
+ return clean(lines).map(sentence);
 }
 function washLines(wash){
  if(wash.enabled===false)return ['本次不提供'];
@@ -46,7 +59,8 @@ function washLines(wash){
  return output;
 }
 async function art(name){const i=new Image();i.src=new URL('./assets/'+name+'.png',import.meta.url);await i.decode();return i;}
-const ink='#39323e', plum='#584960', lineColor='#cebfac', goldInk='#665038';
+const {text:ink,title:plum,rule:lineColor}=palette.care;
+const goldInk=palette.promise.title;
 const serif='"Lili Serif", "Noto Serif CJK TC", "Noto Color Emoji", serif';
 const sans='"Noto Sans CJK TC", "Noto Color Emoji", system-ui, sans-serif';
 const lineHeight=23;
@@ -79,17 +93,12 @@ export async function buildPDF(f,brand=brandDefaults){
   ctx.fillStyle=color;ctx.fill();
  }
  function rule(x,top,width,color=lineColor){ctx.fillStyle=color;ctx.fillRect(x,top,width,1);}
- function brushedGold(x,width){
-  const paint=ctx.createLinearGradient(x,0,x+width,0);
-  for(const [at,tone] of [[0,'#92734f'],[.30,'#cab28a'],[.52,'#f2e5c8'],[.76,'#bda079'],[1,'#9b805f']])paint.addColorStop(at,tone);
-  return paint;
- }
  function page(first=false){
   c=document.createElement('canvas');c.width=W*2;c.height=H*2;pages.push(c);
   ctx=c.getContext('2d');ctx.scale(2,2);ctx.fillStyle='white';ctx.fillRect(0,0,W,H);
   if(first){
    ctx.textAlign='center';text('毛孩專屬照護計畫書',W/2,62,31,true,plum);
-   text('The Pet Sitter Lili',W/2,89,14,false,'#756b7b');ctx.textAlign='left';y=110;
+   text('The Pet Sitter Lili',W/2,89,14,false,ink);ctx.textAlign='left';y=110;
   }else{
    text('ㄌㄌ保姆',M,48,17,true,plum);ctx.textAlign='right';
    text('毛孩專屬照護計畫書',W-M,48,14,true,plum);ctx.textAlign='left';rule(M,63,inner);y=83;
@@ -101,8 +110,8 @@ export async function buildPDF(f,brand=brandDefaults){
  function section(title){
   if(cover)y+=7;
   ensure(116);text(title,M,y+24,21,true,serviceTheme?goldInk:plum);y+=37;
-  rule(M,y,inner,serviceTheme?brushedGold(M,inner):lineColor);
-  if(!serviceTheme)rule(M,y,38,'#987c5f');
+  rule(M,y,inner,serviceTheme?palette.promise.rule:lineColor);
+  if(!serviceTheme)rule(M,y,38,lineColor);
   y+=9;
  }
  // A row shares one surface and one bottom edge. Very uneven text uses full-width rows.
@@ -133,16 +142,16 @@ export async function buildPDF(f,brand=brandDefaults){
    const capacity=Math.max(1,Math.floor((B-y-headHeight-22)/lineHeight));
    const parts=cols.map(col=>col.lines.slice(col.pos,col.pos+capacity));
    const height=headHeight+22+lineHeight*Math.max(1,...parts.map(p=>p.length));
-   box(M,y,inner,height,serviceTheme?'#fbf5e5':'#f8f7f9',9);
-   if(serviceTheme)rule(M+12,y+5,inner-24,brushedGold(M+12,inner-24));
-   if(cover){ctx.fillStyle='#ddd6e1';ctx.fillRect(M+12,y+7,inner-24,2);}
+   box(M,y,inner,height,serviceTheme?palette.promise.surface:palette.care.surface,9);
+   if(serviceTheme)rule(M+12,y+5,inner-24,palette.promise.rule);
+   if(cover){ctx.fillStyle=lineColor;ctx.fillRect(M+12,y+7,inner-24,2);}
    cols.forEach((col,k)=>{
     const x=M+k*width;
-    if(k){ctx.fillStyle=serviceTheme?'#d9c7a2':'#dfd9e2';ctx.fillRect(x,y+12,1,height-24);}
+    if(k){ctx.fillStyle=serviceTheme?palette.promise.rule:lineColor;ctx.fillRect(x,y+12,1,height-24);}
     if(continued&&!parts[k].length)return;
     col.heads.forEach((t,j)=>text(t,x+16,y+25+inset+j*24,16,true,serviceTheme?goldInk:plum));
     const baseline=y+headHeight+19;
-    parts[k].forEach((s,j)=>text(s,x+16,baseline+j*lineHeight));
+    parts[k].forEach((s,j)=>text(s,x+16,baseline+j*lineHeight,15,false,serviceTheme?palette.promise.text:ink));
     col.pos+=parts[k].length;
    });
    y+=height+9;continued=true;remaining=cols.some(col=>col.pos<col.lines.length);
@@ -166,10 +175,10 @@ export async function buildPDF(f,brand=brandDefaults){
   const part=notes.splice(0,capacity);
   const panelH=part.length?90+part.length*22:61;
   const height=Math.max(124,pad*2+details.length*24,pad*2+panelH);
-  box(M,y,inner,height,'#dfdbe3',15);
+  box(M,y,inner,height,palette.care.surface,15);
   const logoY=y+(Math.min(height,160)-logo)/2;
   ctx.drawImage(cat,M+pad,logoY,logo,logo*cat.height/cat.width);
-  details.forEach(([t,size,b],j)=>text(t,detailX,y+pad+20+j*24,size,b,plum));
+  details.forEach(([t,size,b],j)=>text(t,detailX,y+pad+20+j*24,size,b,b?plum:ink));
   const px=W-M-panelW-pad,py=y+pad;
   box(px,py,panelW,panelH,'#fcfbfd',10);
   text('服務影像對外分享',px+16,py+20,12,false,plum);
@@ -182,9 +191,9 @@ export async function buildPDF(f,brand=brandDefaults){
  }while(familyLines.length||notes.length);
  const care=careBlocks(f);
  const basics=[
-  ['陪伴毛孩的時間與細節',clean([f.booking.dates,f.booking.times,...f.booking.services])],
+  ['陪伴毛孩的時間與細節',clean([f.booking.dates,f.booking.times,...f.booking.services.map(s=>serviceName(s,f.groups))])],
   ['回家的方式與門鎖安全',clean([f.entry.pickup&&'• 取鑰匙　'+f.entry.pickup,f.entry.door,f.entry.return&&'• 還鑰匙　'+f.entry.return])],
-  ['身體小狀況與特別照顧',care.filter(b=>b.id.endsWith('-health')).flatMap(b=>[b.title,...b.lines.map(natural)])]
+  ['身體小狀況與特別照顧',care.filter(b=>b.id.endsWith('-health')).flatMap(b=>[b.title,...careText('health',f.groups[b.id.split('-')[0]].health)])]
  ].filter(([,ls])=>ls.length);
  rows(basics,3);
  const pets=Object.entries(f.groups).flatMap(([kind,g])=>g.pets.map(p=>[(kind==='cat'?'🐱 ':'🐶 ')+(p.name||'毛寶'),clean([petStory(p)])]));
@@ -193,7 +202,7 @@ export async function buildPDF(f,brand=brandDefaults){
  const foods=care.filter(b=>/-(dry|wet|snack)$/.test(b.id));
  if(foods.length){section('每一餐的份量與愛吃的口味');
   for(const kind of Object.keys(f.groups)){
-   rows(foods.filter(b=>b.id.startsWith(kind+'-')).map(b=>[b.title,b.lines.map(natural).filter(Boolean)]),3);
+   rows(foods.filter(b=>b.id.startsWith(kind+'-')).map(b=>[b.title,careText(b.id.split('-')[1],f.groups[kind].food[b.id.split('-')[1]])]),3);
   }
  }
  const headings={water:'隨時隨地乾淨清爽的飲水',wash:'洗滌用品與位置',toilet:'如廁環境清潔與代謝觀察',play:'放鬆心情的玩耍與陪伴',walk:'散步與返家整理'};
@@ -202,13 +211,13 @@ export async function buildPDF(f,brand=brandDefaults){
   const species=kind==='cat'?'🐱':'🐶';
   for(const [key,title] of Object.entries(headings)){
    const block=care.find(b=>b.id===kind+'-'+key);
-   const lines=key==='wash'?washLines(g.wash):block?block.lines.map(natural).filter(Boolean):[];
+   const lines=block?careText(key,g[key]):[];
    if(key==='toilet'&&kind==='cat')lines.push('爸爸媽媽出門前記得幫寶貝補足量的貓砂，讓他們更舒適上廁所喔！');
    if(lines.length)other.push([species+' '+title,lines]);
   }
  }
  if(f.environment)other.push(['舒適空間控制與電器使用',[f.environment]]);
- if(f.extra)other.push(['爸爸媽媽交代的貼心任務',[f.extra]]);
+ if(f.extra&&!(f.extra.includes('垃圾')&&routineWaste(f.extra)))other.push(['爸爸媽媽交代的貼心任務',[f.extra]]);
  if(other.length){section('日常照護安排');rows(other);}
  serviceTheme=true;
  if(brand.service.trim()){

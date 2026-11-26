@@ -1,6 +1,21 @@
+// Opaque PDF colors: families delegate care in mist purple; Lili's commitments use warm cream.
+export const palette={
+ care:{surface:'#EFEDF2',rule:'#DCD6E3',title:'#66596F',text:'#665E6C'},
+ promise:{surface:'#F8F5EE',rule:'#E6DED0',title:'#82735D',text:'#756C60'}
+};
+const oldArrival='於服務當天或前一天，ㄌㄌ會與爸爸媽媽確認更精確的預計抵達時間，並於告知時間的前後30分鐘內抵達。';
+const arrival='於服務當天或前一天，ㄌㄌ會與爸爸媽媽確認更精確的預計抵達時間，並於告知時間的前後30～40分鐘內抵達。';
+export function readBrand(saved){
+ const settings={...brandDefaults,...saved};
+ if(typeof settings.service==='string'){
+  settings.service=settings.service.split(/(\r?\n)/).map(line=>line===oldArrival?arrival:line).join('');
+ }
+ return settings;
+}
+
 export const brandDefaults = {
   service: `🕒 出發前的小約定
-於服務當天或前一天，ㄌㄌ會與爸爸媽媽確認更精確的預計抵達時間，並於告知時間的前後30分鐘內抵達。
+${arrival}
 
 🐾 陪伴期間的照護與分享
 依照專屬照護計畫，逐一完成毛寶的生活照顧與個別需求。陪伴過程中，若捕捉到可愛、有趣的日常片刻，也會隨時與爸爸媽媽分享照片及影片，並於服務完成後提供本次照護日誌。

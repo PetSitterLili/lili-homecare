@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="zh-Hant"><meta charset="utf-8"><meta name="robots" content="noindex,nofollow,noarchive">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>開啟ㄌㄌ保姆工作區</title>
-<link rel="stylesheet" href="./workspace.css?v=2.0.1126.3">
+<link rel="stylesheet" href="./workspace.css?v=2.0.1126.4">
 <main style="display:block;max-width:600px;padding:28px"><h1>開啟ㄌㄌ保姆工作區</h1>
 <p id="message" role="status">正在取得新版工作區，本機草稿會保留。</p>
 <a href="./">回到家庭檔案</a></main>
@@ -22,9 +22,9 @@ try{
    };
    worker.addEventListener('statechange',changed);changed();
  });
- const cache=await caches.open('lili-homecare-shell-2.0.1126.3');
+ const cache=await caches.open('lili-homecare-shell-2.0.1126.4');
  const shell=await cache.match(new URL('./index.html',location.href));
- if(!shell||!(await shell.text()).includes('workspace.mjs?v=2.0.1126.3'))throw Error('not ready');
+ if(!shell||!(await shell.text()).includes('workspace.mjs?v=2.0.1126.4'))throw Error('not ready');
  location.replace('./');
 }catch{
  message.textContent='新版尚未準備好。可先回到家庭檔案，網路穩定後再開啟此頁。';
