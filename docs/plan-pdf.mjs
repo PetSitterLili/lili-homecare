@@ -1,6 +1,6 @@
-import {quoteLines,overtimeText} from './quote.mjs?v=2.0.1126.44';
-import {activeFamily,filename,careBlocks,serviceName,bookingLines} from './workspace-model.mjs?v=2.0.1126.44';
-import {brandDefaults,links,palette} from './brand.mjs?v=2.0.1126.44';
+import {quoteLines,overtimeText} from './quote.mjs?v=2.0.1126.45';
+import {activeFamily,filename,careBlocks,serviceName,bookingLines} from './workspace-model.mjs?v=2.0.1126.45';
+import {brandDefaults,links,palette} from './brand.mjs?v=2.0.1126.45';
 const W=794,H=1123,M=38,B=1060,inner=W-2*M;
 const clean=values=>values.filter(x=>typeof x==='string'&&x.trim());
 const sentence=value=>/[。！？.!?]$/.test(value.trim())?value.trim():value.trim()+'。';
@@ -52,7 +52,7 @@ function washLines(wash){
  for(const [key,detailKey,name] of [['sponge','spongePlace','菜瓜布'],['soap','soapPlace','洗碗精']]){
   const status=clean([wash[key]])[0]?.trim(),detail=clean([wash[detailKey]])[0]?.trim();
   if(!status&&!detail)continue;
-  const wording={'有，寵物專用':'有寵物專用'+name,'與人共用':name+'與家人共用','無':'沒有'+name,'待家長提供':name+'待家長提供'};
+  const wording={'有，寵物專用':'有寵物專用'+name,'有，使用方式待確認':'備有'+name+'（是否專用待確認）','與人共用':name+'與家人共用','不使用':'不使用'+name,'無':'沒有'+name,'無寵物專用，使用方式待確認':'未提供寵物專用'+name+'（清潔方式待確認）','待家長提供':name+'待家長提供'};
   const description=wording[status]||(status?name+'（'+status+'）':name);
   output.push(sentence(description+(detail?'（'+detail+'）':'')));
  }
@@ -71,11 +71,11 @@ export async function buildPDF(f,brand=brandDefaults){
  await document.fonts.load('700 18px "Lili Serif"','毛孩專屬照護計畫書');
  await document.fonts.ready;
  const [cat,ig,line]=await Promise.all(['cat','ig','line'].map(art));
- const pages=[];
+ const pages=[],drawnText=[];
  let ctx,c,y,cover=true,serviceTheme=false;
  function font(size,bold){return (bold?'700 ':'400 ')+size+'px '+(bold?serif:sans);}
  function text(str,x,baseline,size=15,bold=false,color=ink){
-  ctx.font=font(size,bold);ctx.fillStyle=color;ctx.fillText(str,x,baseline);
+  ctx.font=font(size,bold);ctx.fillStyle=color;ctx.fillText(str,x,baseline);drawnText.push(String(str));
  }
  function wrap(value,width,size=15,bold=false){
   ctx.font=font(size,bold);
@@ -258,5 +258,17 @@ export async function buildPDF(f,brand=brandDefaults){
  object(1,'<< /Type /Catalog /Pages 2 0 R >>');
  object(2,'<< /Type /Pages /Count '+pages.length+' /Kids ['+pages.map((_,i)=>(3+i*3)+' 0 R').join(' ')+'] >>');
  for(let i=0;i<pages.length;i++){const id=3+i*3,base64=pages[i].toDataURL('image/jpeg',.94).split(',')[1],bin=atob(base64),jpg=Uint8Array.from(bin,c=>c.charCodeAt(0)),stream='q\n595.28 0 0 841.89 0 0 cm\n/Im0 Do\nQ\n';object(id,'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /XObject << /Im0 '+(id+1)+' 0 R >> >> '+' /Annots ['+(pages[i].links||[]).map(({x,y,url})=>'<< /Type /Annot /Subtype /Link /Rect ['+[x*.75,(H-y-88)*.75,(x+78)*.75,(H-y)*.75].join(' ')+'] /Border [0 0 0] /A << /S /URI /URI ('+url+') >> >>').join(' ')+'] /Contents '+(id+2)+' 0 R >>');offsets[id+1]=length;bytes((id+1)+' 0 obj\n<< /Type /XObject /Subtype /Image /Width '+pages[i].width+' /Height '+pages[i].height+' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length '+jpg.length+' >>\nstream\n');bytes(jpg);bytes('\nendstream\nendobj\n');object(id+2,'<< /Length '+encoder.encode(stream).length+' >>\nstream\n'+stream+'endstream');}
- const xref=length,count=3+pages.length*3;bytes('xref\n0 '+count+'\n0000000000 65535 f \n');for(let i=1;i<count;i++)bytes(String(offsets[i]).padStart(10,'0')+' 00000 n \n');bytes('trailer\n<< /Size '+count+' /Root 1 0 R >>\nstartxref\n'+xref+'\n%%EOF');return {blob:new Blob(parts,{type:'application/pdf'}),name:filename(f),pages:pages.map(c=>c.toDataURL('image/jpeg',.8))};
+ const xref=length,count=3+pages.length*3;bytes('xref\n0 '+count+'\n0000000000 65535 f \n');for(let i=1;i<count;i++)bytes(String(offsets[i]).padStart(10,'0')+' 00000 n \n');bytes('trailer\n<< /Size '+count+' /Root 1 0 R >>\nstartxref\n'+xref+'\n%%EOF');return {blob:new Blob(parts,{type:'application/pdf'}),name:filename(f),drawnText,pages:pages.map(c=>c.toDataURL('image/jpeg',.8))};
+}
+
+// Internal lexical check against the actual strings submitted to the PDF canvas.
+// Unmatched means review, not necessarily loss. Never infer semantic equivalence.
+export function auditLegacyCoverage(original,drawnText){
+ const norm=s=>String(s??'').normalize('NFKC').replace(/[\p{P}\p{S}\s]/gu,'');
+ const hay=(drawnText||[]).map(norm).join('');const groups=[],excluded=[];let title='',rows=[],matched=0,total=0;
+ const flush=()=>{if(rows.length)groups.push({title,rows});rows=[];};
+ const skip=t=>/^(時間戳記|修改連結|電子郵件地址|本次預約方案與日期時間|家中若有貴重財物)/.test(t);
+ let inSection=false;
+ for(const line of String(original||'').split(/\r?\n/)){const t=line.trim();if(!t)continue;if(t.startsWith('【')){flush();title=t.replace(/^【|】$/g,'');inSection=true;continue;}if(!inSection)continue;if(skip(title)){excluded.push(title+'｜'+t);continue;}const key=norm(t);if(!key)continue;const hit=key.length>=3&&hay.includes(key);rows.push({text:t,matched:hit});total++;if(hit)matched++;}
+ flush();return {matched,total,percent:total?Math.round(matched/total*1000)/10:0,groups,excluded};
 }
