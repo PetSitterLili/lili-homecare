@@ -1,13 +1,13 @@
-import {inspectCarePatch,applyCarePatch} from './care-patch.mjs?v=2.0.1126.38';
-import {rememberGrant,recallGrant,forgetGrant} from './tab-grant.mjs?v=2.0.1126.38';
-import {displayQuoteLabel,legacyQuoteReference,oldBookingText,hasCurrentBooking,inquiryQuote,mixedPlan,mixedCare,mixedService,defaultRates,readRates,days,travel,rate,holidayRows,quoteKey,savedQuote,quoteLines,money,overtimeText} from './quote.mjs?v=2.0.1126.38';
-import {brandDefaults,readBrand} from './brand.mjs?v=2.0.1126.38';
+import {inspectCarePatch,applyCarePatch} from './care-patch.mjs?v=2.0.1126.39';
+import {rememberGrant,recallGrant,forgetGrant} from './tab-grant.mjs?v=2.0.1126.39';
+import {displayQuoteLabel,legacyQuoteReference,oldBookingText,hasCurrentBooking,inquiryQuote,mixedPlan,mixedCare,mixedService,defaultRates,readRates,days,travel,rate,holidayRows,quoteKey,savedQuote,quoteLines,money,overtimeText} from './quote.mjs?v=2.0.1126.39';
+import {brandDefaults,readBrand} from './brand.mjs?v=2.0.1126.39';
 
-import {sortFamilyDirectory,validServiceDate,taipeiDate,nextBookingDate,orderUpcomingFamilies,recentFamilyIds,profileStages,safeProfileUrl,readProfile,familyArea,profileAge,matchesProfile,prepareProfilePatch,applyProfilePatch,bookingDateGroups,replaceBookingDates,bookingDateLabel,lineHistory,prepareLineHistory,applyLineHistory,syncOverview,matchesFamily,prepareLegacyBatch,noteSpecs,noteRows,writeNoteRows,noteCycle,noteActive,bindPendingNotes,activeFamily,bookingSegments,bookingLines,serviceName,fresh,blanks,fields,titles,day,filename,mediaLabel,warnings,publicBlocks,tasks,sourceKey,normalize,migrate} from './workspace-model.mjs?v=2.0.1126.38';
-import {makeText as legacyText} from './model.mjs?v=2.0.1126.38';
-import {DriveStore,digest} from './drive.mjs?v=2.0.1126.38';
-import {openDB,storeDB} from './drafts.mjs?v=2.0.1126.38';
-import {buildPDF} from './plan-pdf.mjs?v=2.0.1126.38';
+import {sortFamilyDirectory,validServiceDate,taipeiDate,nextBookingDate,orderUpcomingFamilies,recentFamilyIds,profileStages,safeProfileUrl,readProfile,familyArea,profileAge,matchesProfile,prepareProfilePatch,applyProfilePatch,bookingDateGroups,replaceBookingDates,bookingDateLabel,lineHistory,prepareLineHistory,applyLineHistory,syncOverview,matchesFamily,prepareLegacyBatch,noteSpecs,noteRows,writeNoteRows,noteCycle,noteActive,bindPendingNotes,activeFamily,bookingSegments,bookingLines,serviceName,fresh,blanks,fields,titles,day,filename,mediaLabel,warnings,publicBlocks,tasks,sourceKey,normalize,migrate} from './workspace-model.mjs?v=2.0.1126.39';
+import {makeText as legacyText} from './model.mjs?v=2.0.1126.39';
+import {DriveStore,digest} from './drive.mjs?v=2.0.1126.39';
+import {openDB,storeDB} from './drafts.mjs?v=2.0.1126.39';
+import {buildPDF} from './plan-pdf.mjs?v=2.0.1126.39';
 const $=id=>document.getElementById(id),drive=new DriveStore(),db=storeDB(await openDB().catch(error=>{$('main').innerHTML='<div class="panel"><h1>目前無法啟用草稿保存</h1><p>此瀏覽器未能開啟本機資料庫，請換外部瀏覽器或檢查儲存空間；尚未開放填寫，避免資料遺失。</p></div>';throw error;}));
 let records=await db.all(),entry=null,view='service',kind='cat',petIndex=0,undo=[],syncTimer,localChain=Promise.resolve(),syncBusy=false,photoBusy=false,pdf=null,photoUrl=null,localFailure=false;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -293,6 +293,7 @@ function filterDialog(){
  function preview(){const q=collect();if(q.from&&q.to&&q.from>q.to){count.textContent='請確認月份起訖';apply.disabled=true;return;}const n=records.filter(r=>!!r.f.archived===archiveView&&matchesFamily(r.f,$('search').value)&&matchesProfile(r.f,q)).length;count.textContent='符合 '+n+' 戶';apply.textContent='顯示 '+n+' 戶家庭';apply.disabled=false;}
  if(!archiveView)add('booking','預約狀態',[['upcoming','今日／未來有預約'],['none','無今日或未來預約']]);
  add('risk','接案狀態',Object.entries(riskLabel));
+ add('excludeRisk','排除家庭',[['blacklist','排除黑名單'],['watch','排除重點注意']]);
  add('city','服務縣市',[['嘉義市','嘉義市'],['嘉義縣','嘉義縣'],['unknown','其他／未知']]);
  const districts=[...new Set(records.map(r=>familyArea(r.f).district).filter(Boolean))].sort();if(districts.length)add('district','行政區',districts.map(d=>[d,d]));
  add('type','家庭類型',[['cat','純喵'],['dog','純犬'],['mixed','犬喵同住'],['unknown','尚未建毛寶']]);
