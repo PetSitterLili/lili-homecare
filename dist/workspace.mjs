@@ -1,12 +1,12 @@
-import {rememberGrant,recallGrant,forgetGrant} from './tab-grant.mjs?v=2.0.1126.14';
-import {mixedPlan,mixedCare,mixedService,defaultRates,readRates,days,travel,rate,holidayRows,quoteKey,savedQuote,quoteLines,money,overtimeText} from './quote.mjs?v=2.0.1126.14';
-import {brandDefaults,readBrand} from './brand.mjs?v=2.0.1126.14';
+import {rememberGrant,recallGrant,forgetGrant} from './tab-grant.mjs?v=2.0.1126.15';
+import {mixedPlan,mixedCare,mixedService,defaultRates,readRates,days,travel,rate,holidayRows,quoteKey,savedQuote,quoteLines,money,overtimeText} from './quote.mjs?v=2.0.1126.15';
+import {brandDefaults,readBrand} from './brand.mjs?v=2.0.1126.15';
 
-import {prepareLegacyBatch,noteSpecs,noteRows,writeNoteRows,noteCycle,noteActive,bindPendingNotes,activeFamily,bookingSegments,bookingLines,serviceName,fresh,blanks,fields,titles,day,filename,mediaLabel,warnings,publicBlocks,tasks,sourceKey,normalize,migrate} from './workspace-model.mjs?v=2.0.1126.14';
-import {makeText as legacyText} from './model.mjs?v=2.0.1126.14';
-import {DriveStore,digest} from './drive.mjs?v=2.0.1126.14';
-import {openDB,storeDB} from './drafts.mjs?v=2.0.1126.14';
-import {buildPDF} from './plan-pdf.mjs?v=2.0.1126.14';
+import {matchesFamily,prepareLegacyBatch,noteSpecs,noteRows,writeNoteRows,noteCycle,noteActive,bindPendingNotes,activeFamily,bookingSegments,bookingLines,serviceName,fresh,blanks,fields,titles,day,filename,mediaLabel,warnings,publicBlocks,tasks,sourceKey,normalize,migrate} from './workspace-model.mjs?v=2.0.1126.15';
+import {makeText as legacyText} from './model.mjs?v=2.0.1126.15';
+import {DriveStore,digest} from './drive.mjs?v=2.0.1126.15';
+import {openDB,storeDB} from './drafts.mjs?v=2.0.1126.15';
+import {buildPDF} from './plan-pdf.mjs?v=2.0.1126.15';
 const $=id=>document.getElementById(id),drive=new DriveStore(),db=storeDB(await openDB().catch(error=>{$('main').innerHTML='<div class="panel"><h1>目前無法啟用草稿保存</h1><p>此瀏覽器未能開啟本機資料庫，請換外部瀏覽器或檢查儲存空間；尚未開放填寫，避免資料遺失。</p></div>';throw error;}));
 let records=await db.all(),entry=null,view='service',kind='cat',petIndex=0,undo=[],syncTimer,localChain=Promise.resolve(),syncBusy=false,photoBusy=false,pdf=null,photoUrl=null,localFailure=false;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -38,7 +38,7 @@ function status(){
  const el=$('saveState');if(!el||!entry)return;
  el.textContent=failures.has(entry.id)?'本機儲存失敗，請先下載備份':pending.get(entry.id)?'正在儲存本機草稿':blocked.has(entry.id)?'已存本機 · '+(entry.syncError||'雲端待處理'):!navigator.onLine?'離線 · 已存本機':syncBusy&&entry.syncedRev!==entry.rev?'已存本機 · 正在同步':entry.syncedRev===entry.rev&&entry.remote?'已同步至 Google Drive · '+(entry.syncedAt?new Date(entry.syncedAt).toLocaleString():'完成'):connected?'已存本機 · 等待雲端同步':'已存本機 · 請連接 Drive 同步';
 }
-function list(){const term=$('search').value.toLowerCase();$('families').innerHTML=records.filter(r=>!!r.f.archived===archiveView).filter(r=>(r.f.name+' '+Object.values(r.f.groups).flatMap(g=>g.pets.map(p=>p.name)).join(' ')).toLowerCase().includes(term)).map(r=>'<button data-id="'+esc(r.id)+'" class="'+(r.id===entry?.id?'active':'')+'">'+esc(r.f.name||'未命名家庭')+'<small>'+(r.syncedRev===r.rev&&r.remote?'Drive 已同步':'原瀏覽器草稿')+'</small>'+(r.f.importReview?'<small class="import-review-tag">◷ 舊資料待複核</small>':'')+'</button>').join('');}
+function list(){const term=$('search').value;$('families').innerHTML=records.filter(r=>!!r.f.archived===archiveView).filter(r=>matchesFamily(r.f,term)).map(r=>'<button data-id="'+esc(r.id)+'" class="'+(r.id===entry?.id?'active':'')+'">'+esc(r.f.name||'未命名家庭')+'<small>'+(r.syncedRev===r.rev&&r.remote?'Drive 已同步':'原瀏覽器草稿')+'</small>'+(r.f.importReview?'<small class="import-review-tag">◷ 舊資料待複核</small>':'')+'</button>').join('');}
 async function openRecord(id){await localChain;entry=records.find(r=>r.id===id);if(!entry)return;undo=[];kind=Object.keys(entry.f.groups)[0];petIndex=0;view='service';pdf=null;await db.put('settings',id,'lastFamily');render();}
 async function newRecord(demo=false){archiveView=false;$('archive').textContent='已刪除家庭';if(photoBusy){toast('請等待照片保存完成');return;}const f=fresh();if(demo){f.name='姆姆家四貓（操作範例）';f.groups.cat.pets=[{name:'姆姆',identity:'白底虎斑',personality:'慢熟，依他的步調靠近'}];f.groups.cat.food.dry={item:'範例飼料',amount:'三分之一',unit:'杯',location:'廚房右側下櫃',leftover:'移出洗碗後放回'};}const r={id:f.id,f,remote:null,rev:1,syncedRev:0};records.push(r);await persist(r);await openRecord(r.id);view='edit';render();}
 function button(text,fn,cl=''){const b=document.createElement('button');b.type='button';b.textContent=text;b.className=cl;b.onclick=fn;return b;}
@@ -301,31 +301,96 @@ function crmInput(parent,label,value='',type='number',step='1'){const l=crmEl('l
 function crmCheck(parent,label,value){const l=crmEl('label');const i=crmEl('input');i.type='checkbox';i.checked=value;l.append(i,document.createTextNode(label));parent.append(l);return i;}
 function currentRates(){try{return readRates(brand.rates);}catch{return structuredClone(defaultRates);}}
 function quotePanel(f){const root=crmEl('div','','panel');const q=savedQuote(f);root.append(heading('本次照護報價'),crmEl('p',q?(q.key!==quoteKey(f)?'預約或毛寶數量已變更，請重新確認報價':money(q.total)+'｜已確認報價'):'尚未確認報價'),button('開啟報價試算器',()=>quoteDialog(f),'primary'),button('加時照護費用'+(f.booking.overtime?'｜每15分 '+money(Number(f.booking.overtimeFee)):'｜未啟用'),()=>overtimeDialog(f)),button('歷史報價紀錄',()=>historyDialog(f)));return root;}
-function quoteDialog(f){const b=f.booking,rs=bookingSegments(b),r=currentRates(),old=savedQuote(f),c=f.groups.cat?.pets.length||0,d=f.groups.dog?.pets.length||0;
-const body=crmEl('div'),dlg=crmDialog('本次報價試算器',body);body.append(crmEl('p',c+' 喵寶／'+d+' 犬寶 · 依本次預約自動統計'));
-const form=crmEl('div','','crm-fields');body.append(form);const km=crmInput(form,'單程機車導航公里',old?.km??'','number','0.1'),travelOverride=crmInput(form,'車馬費手動覆寫（選填）',(old?.key===quoteKey(f)?old?.travel:undefined)??''),reason=crmInput(form,'額外調整原因',(old?.key===quoteKey(f)?old?.reason:'')??'','text'),adjust=crmInput(form,'全期額外費用／優惠（負數）',(old?.key===quoteKey(f)?old?.adjust:0)??0);
-const diff=crmEl('label','照護難度（內部）');const select=crmEl('select');for(const x of ['易','中','偏難']){const o=crmEl('option',x);o.value=x;select.append(o);}select.value=old?.difficulty||'易';diff.append(select);form.append(diff);
-const same=old?.key===quoteKey(f);
- let useSavedHolidays=same;
- const individual=c&&d?crmCheck(body,'本次需個別報價（較長散步或特殊複雜環境）',same&&old?.individual===true):null;
+
+function quoteDialog(f){
+ const b=f.booking,rs=bookingSegments(b),r=currentRates(),old=savedQuote(f),c=f.groups.cat?.pets.length||0,d=f.groups.dog?.pets.length||0,same=old?.key===quoteKey(f);
+ const body=crmEl('div'),dlg=crmDialog('本次照護報價',body);
+ body.append(crmEl('p',c+' 喵寶／'+d+' 犬寶 · 依本次預約自動統計'));
+ if(!c&&!d)body.append(crmEl('p','尚未建立毛寶活頁，無法自動判定費率。請先補毛寶資料，或自行設定本次價格。','issue'));
+ let special={};try{special=JSON.parse(b.familyRates||'{}')||{};}catch{}
+ if(typeof special!=='object'||Array.isArray(special))special={};
+ const items=new Map();for(const seg of rs)for(const v of seg.visits){const k=v.service+'|'+v.minutes;if(!items.has(k))items.set(k,{k,service:v.service,min:Number(v.minutes),n:0});items.get(k).n+=days(seg.a,seg.b);}
+ const modeBox=crmEl('div','','booking-visit');modeBox.append(heading('計價方式'));body.append(modeBox);
+ const mode=crmEl('select');mode.setAttribute('aria-label','計價方式');
+ const options=[['standard','依現行標準費率'],['manual','自行設定本次價格'],['special','沿用家庭專屬價']];
+ for(const [v,t] of options){const o=crmEl('option',t);o.value=v;mode.append(o);}modeBox.append(mode);
+ const modeHint=crmEl('p','','muted');modeBox.append(modeHint);
+ const form=crmEl('div','','crm-fields');body.append(form);
+ const km=crmInput(form,'單程機車導航公里',old?.km??'','number','0.1');
+ const travelText=crmEl('p','','muted');body.append(travelText);
  if(c&&d)body.append(crmEl('p',mixedCare));
- const exclude=crmCheck(body,'本次預約排除特殊檔期加價',same&&old?.exclude===true);let special={};try{special=JSON.parse(b.familyRates||'{}')||{};}catch{};const specialNote=crmEl('p','舊客專屬價與本期報價分開保存。若有專屬價，可按下方按鈕套用。');body.append(specialNote);
-const items=new Map();for(const seg of rs)for(const v of seg.visits){const k=v.service+'|'+v.minutes;if(!items.has(k))items.set(k,{k,service:v.service,min:Number(v.minutes),n:0});items.get(k).n+=days(seg.a,seg.b);}
-const rows=[];for(const x of items.values()){const std=rate(c,d,x.service,r);const box=crmEl('div','','booking-visit');const label=x.min+' 分鐘'+(c&&d?mixedPlan:x.service==='生活照顧'?'生活照顧方案':x.service);box.append(crmEl('strong',label+' × '+x.n+' 趟'),crmEl('p',std?'標準照護費 '+money(std.fee)+'／建議 '+std.min+' 分鐘'+(x.min!==std.min?'；服務時間不同，請手動確認':''):'需個別報價，無自動價格'));
-if(c&&d&&x.service===mixedPlan&&special[x.k]===undefined){
- const legacyFees=Object.entries(special).filter(([k])=>k.split('|')[1]===String(x.min)&&mixedService(k.split('|')[0])).map(([,v])=>v);
- if(legacyFees.length&&new Set(legacyFees.map(Number)).size===1)special[x.k]=legacyFees[0];
+ const rows=[];
+ for(const x of items.values()){
+  const std=rate(c,d,x.service,r),box=crmEl('div','','booking-visit');
+  const label=x.min+' 分鐘'+(c&&d?mixedPlan:x.service==='生活照顧'?'生活照顧方案':x.service);
+  if(c&&d&&x.service===mixedPlan&&special[x.k]===undefined){const fees=Object.entries(special).filter(([k])=>k.split('|')[1]===String(x.min)&&mixedService(k.split('|')[0])).map(([,v])=>v);if(fees.length&&new Set(fees.map(Number)).size===1)special[x.k]=fees[0];}
+  box.append(crmEl('strong',label+' × '+x.n+' 趟'));
+  const priceText=crmEl('p');box.append(priceText);
+  const override=crmInput(box,'單趟照護費（不含車馬）','');override.min='0';
+  const sub=crmEl('p','','muted');box.append(sub);body.append(box);
+  rows.push({...x,label,std,override,priceText,sub});
  }
- const existing=old?.rows.find(y=>y.k===x.k);const override=crmInput(box,'單趟照護費手動覆寫（不含車馬）',(same?existing?.fee:special[x.k])??'');body.append(box);rows.push({...x,label,std,override});}
-const result=crmEl('div','','crm-result'),ref=crmEl('div','內部定價參考線（非正式費率）\nNT$800／小時：一般基礎照護\nNT$950／小時：理想勞務報酬\nNT$1,050～1,100／小時：高負荷照護\nNT$1,100～1,200／小時：低承接意願、高不確定性','crm-ref');body.append(result,ref);body.append(button('套用目前標準費率',()=>{useSavedHolidays=false;for(const x of rows)x.override.value='';travelOverride.value='';calc();}),button('套用家庭專屬價',()=>{for(const x of rows)x.override.value=special[x.k]??'';travelOverride.value=special.travel??'';calc();}),button('將手動費率另存為家庭專屬價',async()=>{const next={...special};for(const x of rows){if(x.override.value.trim()!==''){const n=Number(x.override.value);if(!Number.isSafeInteger(n)||n<0)return toast('專屬價須為非負整數');next[x.k]=n;}}if(travelOverride.value.trim()!==''){const n=Number(travelOverride.value);if(!Number.isSafeInteger(n)||n<0)return toast('車馬費須為非負整數');next.travel=n;}if(!await confirmAction('另存家庭專屬價？','只影響這一家未來的試算，不改歷史報價。'))return;snapshot();b.familyRates=JSON.stringify(next);special=next;dirty();toast('家庭專屬價已保存');}),button('清除家庭專屬價',async()=>{if(!await confirmAction('清除家庭專屬價？','歷史成交價不變。'))return;snapshot();b.familyRates='';special={};dirty();toast('已清除家庭專屬價');}));
-const actions=crmEl('div','','crm-actions');let calculated=null;const confirm=button('確認並保存本次報價',()=>{if(!calculated)return;const previous=savedQuote(f);snapshot();if(previous){b.quoteHistory=[...(b.quoteHistory||[]),JSON.stringify(previous)].slice(-100);}b.quote=JSON.stringify(calculated);dirty();dlg.close();render();},'primary');actions.append(confirm);body.append(actions);
-function calc(){calculated=null;confirm.disabled=true;const k=Number(km.value),tv=travelOverride.value.trim()===''?travel(k):Number(travelOverride.value),a=Number(adjust.value);if(!rs.length||km.value===''||!Number.isFinite(k)||k<0||Math.abs(k*10-Math.round(k*10))>1e-8||tv===null||!Number.isSafeInteger(tv)||tv<0||!Number.isSafeInteger(a)){result.textContent='請完成預約、單程公里與有效車馬費。30.1 公里起需手動報價。';return;}if(a&&!reason.value.trim()){result.textContent='請填額外調整原因。';return;}
-const output=[];for(const x of rows){const manual=x.override.value.trim()!=='';const fee=manual?Number(x.override.value):x.std?.fee;if(!Number.isSafeInteger(fee)||fee<0||(!manual&&(individual?.checked||x.min!==x.std?.min))){result.textContent='請確認 '+x.label+' 的手動照護費（時間不同或超出標準）。';return;}output.push({k:x.k,label:x.label,n:x.n,min:x.min,fee,unit:fee+tv,override:manual?x.override.value:''});}
-const holidays=useSavedHolidays?old.holidays:holidayRows(rs,r),holidayTotal=exclude.checked?0:holidays.reduce((sum,x)=>sum+x.total,0),normal=output.reduce((sum,x)=>sum+x.unit*x.n,0),total=normal+a+holidayTotal,minutes=output.reduce((sum,x)=>sum+x.min*x.n,0),trips=output.reduce((sum,x)=>sum+x.n,0);if(total<0||normal+a<tv*trips){result.textContent='一般服務費不可低於車馬費。';return;}
-const rateHour=Math.round((normal+a-tv*trips)*60/minutes),actualHour=Math.round((total-tv*trips)*60/minutes);
-result.textContent=[...output.map(x=>x.label+'：'+money(x.unit)+' × '+x.n+' = '+money(x.unit*x.n)+'｜照護時薪 '+money(Math.round(x.fee*60/x.min))), '每趟車馬費 '+money(tv),'一般服務小計 '+money(normal),...holidays.map(h=>h.name+' '+(h.spans?.join('、')||h.a+'～'+h.b)+'｜'+h.n+' 趟 × '+money(h.fee)+' = '+money(h.total)+(exclude.checked?'（本次排除）':'')),'額外調整 '+money(a),'本次合計 '+money(total),'扣車馬費後照護時薪（不含檔期） '+money(rateHour)+'／小時',...(holidayTotal?['含檔期加價 '+money(actualHour)+'／小時']:[])].join('\n');
-calculated={key:quoteKey(f),date:new Date().toISOString(),km:k,travel:tv,travelOverride:travelOverride.value,reason:reason.value,difficulty:select.value,adjust:a,individual:individual?.checked===true,exclude:exclude.checked,rows:output,holidays,total};confirm.disabled=false;}
-body.addEventListener('input',calc);body.addEventListener('change',calc);calc();dlg.showModal();}
+ const adjBox=crmEl('div','','booking-visit');adjBox.append(heading('額外費用調整（本期）'));body.append(adjBox);
+ const adjMode=crmEl('select');adjMode.setAttribute('aria-label','額外費用調整方式');
+ for(const [v,t]of[['none','無'],['add','額外加收'],['discount','優惠折抵']]){const o=crmEl('option',t);o.value=v;adjMode.append(o);}
+ adjBox.append(adjMode);
+ const adjForm=crmEl('div','','crm-fields');adjBox.append(adjForm);
+ const oldAdj=same?Number(old.adjust)||0:0;
+ adjMode.value=oldAdj<0?'discount':oldAdj>0?'add':'none';
+ const adjust=crmInput(adjForm,'調整金額',Math.abs(oldAdj));adjust.min='0';
+ const reason=crmInput(adjForm,'調整原因',same?old.reason||'':'','text');
+ const advanced=document.createElement('details');advanced.className='quote-advanced';const summary=crmEl('summary','進階報價設定');advanced.append(summary);body.append(advanced);
+ const af=crmEl('div','','crm-fields');advanced.append(af);
+ const travelOverride=crmInput(af,'自訂每趟車馬費（選填）',same?old.travel??'':'');travelOverride.min='0';
+ const diff=crmEl('label','照護難度（內部）'),select=crmEl('select');for(const x of ['易','中','偏難']){const o=crmEl('option',x);o.value=x;select.append(o);}select.value=old?.difficulty||'易';diff.append(select);af.append(diff);
+ const individual=c&&d?crmCheck(advanced,'本次需個別報價（較長散步或特殊複雜環境）',same&&old.individual===true):null;
+ const exclude=crmCheck(advanced,'本次排除特殊檔期加價',same&&old.exclude===true);
+ advanced.append(crmEl('div','內部定價參考線（非正式費率）\nNT$800／小時：一般基礎照護\nNT$950／小時：理想勞務報酬\nNT$1,050～1,100／小時：高負荷照護\nNT$1,100～1,200／小時：低承接意願、高不確定性','crm-ref'));
+ const result=crmEl('div','','crm-result');body.append(result);
+ const keep=crmCheck(body,'將本次單趟費率保留為家庭專屬價（不含本期優惠與加收）',false);
+ const clearSpecial=button('清除家庭專屬價',async()=>{if(!await confirmAction('清除家庭專屬價？','歷史成交價不變。'))return;snapshot();b.familyRates='';special={};dirty();if(mode.value==='special')applyMode('standard');refreshOptions();calc();toast('已清除家庭專屬價');});
+ advanced.append(clearSpecial);
+ const actions=crmEl('div','','crm-actions');body.append(actions);
+ let calculated=null,useSavedHolidays=!!same;
+ const confirm=button('確認並保存本次報價',()=>{if(!calculated)return;const previous=savedQuote(f);snapshot();if(previous){b.quoteHistory=[...(b.quoteHistory||[]),JSON.stringify(previous)].slice(-100);}b.quote=JSON.stringify(calculated);if(keep.checked&&mode.value==='manual'){const next={...special};for(const x of calculated.rows)next[x.k]=x.fee;if(travelOverride.value.trim()!=='')next.travel=calculated.travel;b.familyRates=JSON.stringify(next);}dirty();dlg.close();render();},'primary');actions.append(confirm);
+ const validFee=x=>x!==''&&x!==undefined&&x!==null&&Number.isSafeInteger(Number(x))&&Number(x)>=0;
+ const hasSpecial=()=>rows.some(x=>validFee(special[x.k]))||validFee(special.travel);
+ const standardFee=x=>x.std&&x.min===x.std.min&&!individual?.checked?x.std.fee:undefined;
+ function refreshOptions(){mode.options[2].disabled=!hasSpecial();mode.options[2].textContent=hasSpecial()?'沿用家庭專屬價':'沿用家庭專屬價（尚無適用價格）';clearSpecial.hidden=!Object.keys(special).length;}
+ function applyMode(v){mode.value=v;useSavedHolidays=false;if(v==='standard'||v==='special'){if(individual)individual.checked=false;travelOverride.value=v==='special'&&validFee(special.travel)?special.travel:'';for(const x of rows)x.override.value=v==='special'&&validFee(special[x.k])?special[x.k]:(standardFee(x)??'');}else{for(const x of rows)if(x.override.value.trim()==='')x.override.value=standardFee(x)??'';}keep.checked=false;calc();}
+ function calc(){
+  calculated=null;confirm.disabled=true;
+  adjForm.hidden=adjMode.value==='none';
+  keep.parentElement.hidden=mode.value!=='manual';
+  modeHint.textContent=mode.value==='manual'?'輸入每種服務的單趟價格；勾選保留才會成為下次專屬價。':mode.value==='special'?'已建立專屬價的項目優先使用；其他項目使用符合條件的現行標準費率。':'依毛寶數量與服務時間套用現行標準費率。';
+  const k=Number(km.value),tv=travelOverride.value.trim()===''?travel(k):Number(travelOverride.value),rawA=Number(adjust.value),a=adjMode.value==='none'?0:rawA*(adjMode.value==='discount'?-1:1);
+  const validTravel=km.value!==''&&Number.isFinite(k)&&k>=0&&Math.abs(k*10-Math.round(k*10))<=1e-8&&tv!==null&&Number.isSafeInteger(tv)&&tv>=0;
+  travelText.textContent=validTravel?'每趟車馬費：'+money(tv)+(travelOverride.value.trim()?'（自訂）':'（自動計算）'):'請輸入單程公里；30.1 公里以上請在進階設定填車馬費。';
+  let missing='';
+  const output=[];
+  for(const x of rows){
+   const std=standardFee(x),sp=validFee(special[x.k]),manual=mode.value==='manual',chosen=manual?(x.override.value.trim()===''?undefined:Number(x.override.value)):mode.value==='special'&&sp?Number(special[x.k]):std;
+   x.override.parentElement.hidden=!manual;
+   x.priceText.textContent=manual?(x.std?'現行標準參考 '+money(x.std.fee)+'／'+x.std.min+' 分鐘':'需個別報價'):chosen===undefined?'需自行設定本次價格':(mode.value==='special'&&sp?'家庭專屬價 ':'標準照護費 ')+money(chosen)+'／趟';
+   x.sub.textContent=validTravel&&validFee(chosen)?'含車馬費小計 '+money((chosen+tv)*x.n):'';
+   if(!validFee(chosen)){missing ||= x.label;continue;}
+   output.push({k:x.k,label:x.label,n:x.n,min:x.min,fee:Number(chosen),unit:Number(chosen)+tv,override:manual?x.override.value:mode.value==='special'&&sp?String(chosen):''});
+  }
+  if(!rs.length||!validTravel){result.textContent='請先完成預約、單程公里與車馬費。';return;}
+  if(adjMode.value!=='none'&&(!Number.isSafeInteger(rawA)||rawA<0||!reason.value.trim()&&rawA)){result.textContent='請填寫有效的調整金額及原因。';return;}
+  if(missing){result.textContent='「'+missing+'」需自行設定本次價格。';return;}
+  const holidays=useSavedHolidays?old.holidays:holidayRows(rs,r),holidayTotal=exclude.checked?0:holidays.reduce((sum,x)=>sum+x.total,0),normal=output.reduce((sum,x)=>sum+x.unit*x.n,0),total=normal+a+holidayTotal,minutes=output.reduce((sum,x)=>sum+x.min*x.n,0),trips=output.reduce((sum,x)=>sum+x.n,0);
+  if(total<0||normal+a<tv*trips){result.textContent='一般服務費不可低於車馬費。';return;}
+  const rateHour=Math.round((normal+a-tv*trips)*60/minutes),actualHour=Math.round((total-tv*trips)*60/minutes);
+  result.textContent=[...output.map(x=>x.label+'：'+money(x.unit)+' × '+x.n+' = '+money(x.unit*x.n)),'每趟車馬費 '+money(tv),'一般服務小計 '+money(normal),...holidays.map(h=>h.name+' '+(h.spans?.join('、')||h.a+'～'+h.b)+'｜'+h.n+' 趟 × '+money(h.fee)+' = '+money(h.total)+(exclude.checked?'（本次排除）':'')),...(a?[(a<0?'優惠折抵 −':'額外加收 +')+money(Math.abs(a))]:[]),'本次合計 '+money(total),'扣車馬費後照護時薪（不含檔期） '+money(rateHour)+'／小時',...(holidayTotal?['含檔期加價 '+money(actualHour)+'／小時']:[])].join('\n');
+  calculated={key:quoteKey(f),date:new Date().toISOString(),km:k,travel:tv,travelOverride:travelOverride.value,reason:adjMode.value==='none'?'':reason.value,difficulty:select.value,adjust:a,individual:individual?.checked===true,exclude:exclude.checked,rows:output,holidays,total};confirm.disabled=false;
+ }
+ refreshOptions();
+ if(same){mode.value='manual';for(const x of rows)x.override.value=old.rows.find(y=>y.k===x.k)?.fee??'';modeHint.textContent='已載入上次確認價格。';}
+ else{mode.value=hasSpecial()?'special':'standard';for(const x of rows)x.override.value=mode.value==='special'&&validFee(special[x.k])?special[x.k]:(standardFee(x)??'');if(mode.value==='special'&&validFee(special.travel))travelOverride.value=special.travel;}
+ mode.onchange=()=>applyMode(mode.value);body.addEventListener('input',e=>{if(e.target!==mode)calc();});body.addEventListener('change',e=>{if(e.target!==mode){if(e.target===individual&&individual.checked&&mode.value!=='manual')applyMode('manual');else calc();}});
+ calc();dlg.showModal();
+}
 function overtimeDialog(f){const b=f.booking,body=crmEl('div'),dlg=crmDialog('加時照護費用',body);const enabled=crmCheck(body,'本次啟用加時照護費用',b.overtime===true);const q=savedQuote(f),x=q?.key===quoteKey(f)?q.rows[0]:null;const g=crmEl('div','','crm-fields');body.append(g);const total=crmInput(g,'單趟總費用（含車馬）',x?.unit??''),tr=crmInput(g,'其中車馬費',x?q.travel:0),min=crmInput(g,'原服務分鐘',x?.min??60),fee=crmInput(g,'每15分鐘最終費用',b.overtimeFee||150);const info=crmEl('p');body.append(info,button('採用 NT$150',()=>{fee.value=150;}),button('採用試算（四捨五入至整元）',()=>{const n=reference();if(n!==null)fee.value=n;}),button('保存',()=>{if(enabled.checked&&(!Number.isSafeInteger(Number(fee.value))||Number(fee.value)<=0))return toast('請輸入有效加時費');snapshot();b.overtime=enabled.checked;b.overtimeFee=enabled.checked?String(Number(fee.value)):'';dirty();dlg.close();render();},'primary'));function reference(){const a=Number(total.value),t=Number(tr.value),m=Number(min.value);return total.value!==''&&a>=t&&t>=0&&m>0?Math.round((a-t)*15/m):null;}function update(){const n=reference();info.textContent=n===null?'請輸入單趟總費用、車馬費與服務分鐘。':'扣車馬費後每15分鐘參考 '+money(n);}body.addEventListener('input',update);update();dlg.showModal();}
 function historyDialog(f){const body=crmEl('div'),dlg=crmDialog('歷史報價（內部）',body);const all=[...(f.booking.quoteHistory||[]),...(f.booking.quote?[f.booking.quote]:[])].reverse();if(!all.length)body.append(crmEl('p','尚無歷史報價'));for(const s of all){try{const q=JSON.parse(s),box=crmEl('div','','booking-visit');box.append(crmEl('strong',q.date.slice(0,10)+'｜'+money(q.total)),crmEl('p',q.rows.map(x=>x.label+' '+money(x.unit)+' × '+x.n).join('；')));body.append(box);}catch{}}dlg.showModal();}
 $('rateEdit').onclick=()=>{const body=crmEl('div'),dlg=crmDialog('全域費率與特殊檔期',body),r=currentRates();for(const [key,label] of [['cat','純貓｜生活費／分鐘／陪伴費／分鐘'],['dog','純犬｜生活費／分鐘／散步費／分鐘'],['mixed','犬喵同住｜單犬費／分鐘／雙犬費／分鐘']]){body.append(heading(label));r[key].forEach((row,i)=>{const g=crmEl('div','','crm-fields');body.append(crmEl('small',key==='cat'?['1～2 喵','3～6 喵','7 喵以上'][i]:key==='dog'?(i+1)+' 犬':(i+1)+' 喵'),g);row.forEach((v,j)=>{if(key==='cat'&&j===0)return;const input=crmInput(g,['費用','分鐘','費用','分鐘'][(j-(key==='cat'?1:0))],v);input.oninput=()=>row[j]=Number(input.value);});});}

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {fresh,noteSpecs,noteRows,writeNoteRows,noteCycle,noteActive,bindPendingNotes,activeFamily,expiredNoteWarnings,tasks,sourceKey,normalize,prepareLegacyBatch} from '../docs/workspace-model.mjs';
+import {fresh,noteSpecs,noteRows,writeNoteRows,noteCycle,noteActive,bindPendingNotes,activeFamily,expiredNoteWarnings,tasks,sourceKey,normalize,prepareLegacyBatch,matchesFamily} from '../docs/workspace-model.mjs';
 
 
 const f=fresh(),g=f.groups.cat;
@@ -45,3 +45,11 @@ const reviewed={...batch.accepted[0],importReview:false,importReviewedAt:'2026-1
 assert(!normalize(reviewed).importReview&&normalize(reviewed).importReviewedAt==='2026-11-26','review completion persists');
 console.log('9 import checks passed');
 }
+
+
+{
+const x=fresh();x.name='毛寶家庭';x.contact={name:'王家長',phone:'0912-345-678',address:'嘉義縣中埔鄉臺灣路 10 號'};x.groups.cat.pets=[{name:'Kuma'}];
+for(const q of ['毛寶','王家','0912','5678','0912 345 678','+886912345678','中埔','台灣路','kuma','ＫＵＭＡ','中埔 王家',''])assert(matchesFamily(x,q),'search '+q);
+assert(!matchesFamily(x,'立仁路'),'nonmatch');assert(!matchesFamily(x,'9999'),'phone nonmatch');
+}
+
