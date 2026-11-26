@@ -1,12 +1,13 @@
-import {rememberGrant,recallGrant,forgetGrant} from './tab-grant.mjs?v=2.0.1126.31';
-import {displayQuoteLabel,legacyQuoteReference,oldBookingText,hasCurrentBooking,inquiryQuote,mixedPlan,mixedCare,mixedService,defaultRates,readRates,days,travel,rate,holidayRows,quoteKey,savedQuote,quoteLines,money,overtimeText} from './quote.mjs?v=2.0.1126.31';
-import {brandDefaults,readBrand} from './brand.mjs?v=2.0.1126.31';
+import {inspectCarePatch,applyCarePatch} from './care-patch.mjs?v=2.0.1126.32';
+import {rememberGrant,recallGrant,forgetGrant} from './tab-grant.mjs?v=2.0.1126.32';
+import {displayQuoteLabel,legacyQuoteReference,oldBookingText,hasCurrentBooking,inquiryQuote,mixedPlan,mixedCare,mixedService,defaultRates,readRates,days,travel,rate,holidayRows,quoteKey,savedQuote,quoteLines,money,overtimeText} from './quote.mjs?v=2.0.1126.32';
+import {brandDefaults,readBrand} from './brand.mjs?v=2.0.1126.32';
 
-import {sortFamilyDirectory,validServiceDate,taipeiDate,nextBookingDate,orderUpcomingFamilies,recentFamilyIds,profileStages,safeProfileUrl,readProfile,familyArea,profileAge,matchesProfile,prepareProfilePatch,applyProfilePatch,bookingDateGroups,replaceBookingDates,bookingDateLabel,lineHistory,prepareLineHistory,applyLineHistory,syncOverview,matchesFamily,prepareLegacyBatch,noteSpecs,noteRows,writeNoteRows,noteCycle,noteActive,bindPendingNotes,activeFamily,bookingSegments,bookingLines,serviceName,fresh,blanks,fields,titles,day,filename,mediaLabel,warnings,publicBlocks,tasks,sourceKey,normalize,migrate} from './workspace-model.mjs?v=2.0.1126.31';
-import {makeText as legacyText} from './model.mjs?v=2.0.1126.31';
-import {DriveStore,digest} from './drive.mjs?v=2.0.1126.31';
-import {openDB,storeDB} from './drafts.mjs?v=2.0.1126.31';
-import {buildPDF} from './plan-pdf.mjs?v=2.0.1126.31';
+import {sortFamilyDirectory,validServiceDate,taipeiDate,nextBookingDate,orderUpcomingFamilies,recentFamilyIds,profileStages,safeProfileUrl,readProfile,familyArea,profileAge,matchesProfile,prepareProfilePatch,applyProfilePatch,bookingDateGroups,replaceBookingDates,bookingDateLabel,lineHistory,prepareLineHistory,applyLineHistory,syncOverview,matchesFamily,prepareLegacyBatch,noteSpecs,noteRows,writeNoteRows,noteCycle,noteActive,bindPendingNotes,activeFamily,bookingSegments,bookingLines,serviceName,fresh,blanks,fields,titles,day,filename,mediaLabel,warnings,publicBlocks,tasks,sourceKey,normalize,migrate} from './workspace-model.mjs?v=2.0.1126.32';
+import {makeText as legacyText} from './model.mjs?v=2.0.1126.32';
+import {DriveStore,digest} from './drive.mjs?v=2.0.1126.32';
+import {openDB,storeDB} from './drafts.mjs?v=2.0.1126.32';
+import {buildPDF} from './plan-pdf.mjs?v=2.0.1126.32';
 const $=id=>document.getElementById(id),drive=new DriveStore(),db=storeDB(await openDB().catch(error=>{$('main').innerHTML='<div class="panel"><h1>目前無法啟用草稿保存</h1><p>此瀏覽器未能開啟本機資料庫，請換外部瀏覽器或檢查儲存空間；尚未開放填寫，避免資料遺失。</p></div>';throw error;}));
 let records=await db.all(),entry=null,view='service',kind='cat',petIndex=0,undo=[],syncTimer,localChain=Promise.resolve(),syncBusy=false,photoBusy=false,pdf=null,photoUrl=null,localFailure=false;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -16,7 +17,7 @@ let brand=readBrand(await db.get('settings','brand'));
 let draining=false,connecting=false; const blocked=new Set();let activeSyncId=null,brandSyncActive=false,connectionError='',importError='',importingLegacy=false,syncDetail=null;
 function ready(){return navigator.onLine&&drive.token&&Date.now()<drive.expires&&!connecting;}
 function schedule(){clearTimeout(syncTimer);if(ready())syncTimer=setTimeout(drain,1500);status();}
-async function drain(){if(draining||!ready())return;draining=true;status();try{for(const r of records){if(!ready())break;if(r.rev!==r.syncedRev&&(r.f.name.trim()||r.f.archived)&&!blocked.has(r.id))await sync(r);}if(ready()&&brandState.dirty)await syncBrand();}finally{draining=false;status();if(ready()&&records.some(r=>r.rev!==r.syncedRev&&(r.f.name.trim()||r.f.archived)&&!blocked.has(r.id))) {clearTimeout(syncTimer);syncTimer=setTimeout(drain,15000);}}}
+async function drain(){if(importingLegacy||draining||!ready())return;draining=true;status();try{for(const r of records){if(!ready())break;if(r.rev!==r.syncedRev&&(r.f.name.trim()||r.f.archived)&&!blocked.has(r.id))await sync(r);}if(ready()&&brandState.dirty)await syncBrand();}finally{draining=false;status();if(ready()&&records.some(r=>r.rev!==r.syncedRev&&(r.f.name.trim()||r.f.archived)&&!blocked.has(r.id))) {clearTimeout(syncTimer);syncTimer=setTimeout(drain,15000);}}}
 let toastTimer;function toast(t){$('toast').textContent=t;$('toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,6500);}
 function confirmAction(title,text,yes='確認'){return new Promise(resolve=>{$('confirmTitle').textContent=title;$('confirmText').textContent=text;$('yesConfirm').textContent=yes;const d=$('confirm');const finish=result=>{d.close();d.oncancel=null;$('yesConfirm').onclick=null;$('cancelConfirm').onclick=null;resolve(result);};$('yesConfirm').onclick=()=>finish(true);$('cancelConfirm').onclick=()=>finish(false);d.oncancel=e=>{e.preventDefault();finish(false);};d.showModal();});}
 function snapshot(){undo.push(JSON.stringify(entry.f));if(undo.length>40)undo.shift();}
@@ -368,7 +369,59 @@ async function returnDirectory({archive=archiveView}={}){
  try{await db.put('settings','','lastFamily');}catch(e){toast('未能保存上次瀏覽位置：'+e.message);}
  render();window.scrollTo(0,0);
 }
+async function importCareFields(file){
+ if(importingLegacy||syncBusy||draining||photoBusy||connecting)return toast('請等目前作業完成');
+ importingLegacy=true;status();
+ try{
+  if(file.size>20*1024*1024)throw Error('修正檔過大');
+  const packet=JSON.parse(await file.text());await localChain;
+  const plan=inspectCarePatch(packet,records.map(r=>r.f));
+  const body=crmEl('div'),dlg=crmDialog('逐戶預覽照護修正',body),choices=[];
+  body.append(crmEl('p','勾選要採用的修正組。同組欄位一起搬移；任一舊值、旗標或家庭來源不符，就整組略過。'));
+  for(const h of plan){
+   const box=section(h.name,false);
+   for(const set of h.sets){
+    const label=set.label+(set.result==='done'?'（已匯入）':set.result==='conflict'?'（舊值或來源不符，略過）':'');
+    const c=crmCheck(box.body,label,false);c.disabled=set.result!=='ready';choices.push({h,set,c});
+    for(const change of set.changes){
+     if(change.before.value===change.after.value&&change.before.rows===change.after.rows)continue;
+     const family=records.find(r=>r.id===h.id)?.f;
+     const [sp,section,key]=change.path.split('/');
+     const pet=family?.groups[sp]?.pets.find(x=>section==='pet:'+x.id);
+     const label=pet?(pet.name+'・毛寶介紹'):[sp==='cat'?'喵寶':sp==='dog'?'犬寶':'家庭',titles[section]||section,fields[section]?.find(x=>x[0]===key)?.[1]||key].join('・');
+     const p=crmEl('p',label+'\n原有　'+(change.before.value||'空白')+'\n改為　'+(change.after.value||'空白')+(change.before.rows!==change.after.rows?'\n修正後的提醒：'+(change.after.rows?JSON.parse(change.after.rows).map(r=>(r.closed?'已結束':r.temp?'限本期':'長期')+(r.flag?'・列入小卡':'')+' '+r.text).join('\n'):'依欄位預設'):''));p.style.whiteSpace='pre-wrap';box.body.append(p);
+    }
+   }
+   body.append(box.e);
+  }
+  const cancel=dlg.querySelector(':scope > button:last-child');
+  dlg.addEventListener('cancel',e=>{if(apply.disabled)e.preventDefault();});
+  const apply=button('套用勾選的照護修正',async()=>{
+   if(!ready())return toast('請先連接 Google Drive，再套用修正。');
+   apply.disabled=true;cancel.disabled=true;
+   try{
+    if(!ready()||draining||syncBusy||connecting||photoBusy)throw Error('請連接 Drive 並等目前同步完成，再套用。');
+    await localChain;let saved=0,skipped=0;
+    for(const h of plan){
+     const ids=new Set(choices.filter(x=>x.h===h&&x.c.checked).map(x=>x.set.id));
+     if(!ids.size)continue;
+     const r=records.find(x=>x.id===h.id);
+     if(!r?.remote||r.rev!==r.syncedRev||pending.get(h.id)||failures.has(h.id)){skipped+=ids.size;continue;}
+     const {copy,count}=applyCarePatch({...packet,families:packet.families.filter(x=>x.id===h.id)},r.f,ids);
+     skipped+=ids.size-count;if(!count)continue;
+     copy.updatedAt=new Date().toISOString();const next={...r,f:copy,rev:r.rev+1};
+     if(!await db.replaceUnchanged(r,next)){skipped+=count;continue;}
+     Object.assign(r,next);saved+=count;
+    }
+    dlg.close();undo=[];pdf=null;render();toast('已存本機 '+saved+' 組，略過 '+skipped+' 組。請核對同步狀態。');
+   }catch{toast('本次未全部套用。已保存的組別會在下次預覽標為已匯入。');}finally{apply.disabled=false;cancel.disabled=false;}
+  },'primary');
+  body.append(apply);await new Promise(resolve=>{dlg.addEventListener('close',resolve,{once:true});dlg.showModal();});
+ }catch{toast('無法預覽修正檔，請確認格式及家庭來源。');}finally{importingLegacy=false;$('carePatchFile').value='';schedule();status();}
+}
+
 function wireMenu(){
+ $('carePatchImport').onclick=()=>$('carePatchFile').click();$('carePatchFile').onchange=e=>{if(e.target.files[0])importCareFields(e.target.files[0]);};
  const menu=$('appMenu');
  $('menuOpen').onclick=()=>{if(!menu.open)menu.showModal();};
  $('menuClose').onclick=()=>menu.close();
