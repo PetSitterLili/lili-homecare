@@ -1,4 +1,4 @@
-import {noteSpecs,fields} from './workspace-model.mjs?v=2.0.1126.43';
+import {noteSpecs,fields} from './workspace-model.mjs?v=2.0.1126.44';
 
 const own=(o,k)=>Object.hasOwn(o,k)?o[k]:null;
 const same=(a,b)=>a.value===b.value&&a.rows===b.rows;
@@ -31,14 +31,14 @@ export function inspectCarePatch(packet,families){
    if(!/^[a-zA-Z0-9-]{1,100}$/.test(set.id)||seen.has(set.id)||!Array.isArray(set.changes)||!set.changes.length)throw Error('修正組格式錯誤');
    seen.add(set.id);let result=matches&&f.importReview===true?'ready':'conflict';
    for(const c of set.changes){
-    if(typeof c.path!=='string'||used.has(c.path)||!validState(c.before)||!validState(c.after))throw Error('修正欄位格式錯誤');
+    if(typeof c.path!=='string'||used.has(c.path)||!validState(c.before)||!validState(c.after)||(c.beforeAlternatives!==undefined&&(!Array.isArray(c.beforeAlternatives)||c.beforeAlternatives.length>4||!c.beforeAlternatives.every(validState))))throw Error('修正欄位格式錯誤');
     used.add(c.path);const t=matches&&target(f,c.path);
     if(!t){result='conflict';continue;}
     if(c.after.rows!==null){
      const rows=JSON.parse(c.after.rows);
      if(!noteSpecs(f).some(s=>s.obj===t.obj&&s.key===t.key)||rows.filter(r=>r.text.trim()).map(r=>r.text).join('\n')!==c.after.value)throw Error('備註與旗標資料不一致');
     }
-    if(!same({value:own(t.obj,t.key),rows:own(t.obj,'careNoteRows_'+t.key)},c.before))result='conflict';
+    if(![c.before,...(c.beforeAlternatives||[])].some(before=>same({value:own(t.obj,t.key),rows:own(t.obj,'careNoteRows_'+t.key)},before)))result='conflict';
    }
    if(matches&&f.carePatchReceipts?.includes(set.id))result='done';
    return {...set,result};
