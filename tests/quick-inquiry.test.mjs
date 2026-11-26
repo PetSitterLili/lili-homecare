@@ -10,7 +10,7 @@ assert(q(2,2,{walk:'no'}).options[0].fee===1300,'mixed no walk same');
 assert(q(2,2,{walk:'long'}).options[0].reference,'mixed long reference');
 assert(q(0,1,{walk:'yes'}).options[1].recommended,'dog walk');
 assert(q(0,2,{walk:'no'}).options[0].fee===750,'dog life');
-assert(!q(0,3).options.length&&q(0,3).message.includes('暫不開放'),'3 dogs');
+assert(!q(0,3).options.length&&q(0,3).message.includes('暫不承接'),'3 dogs');
 assert(!q(6,1).options.length,'6 cats mixed');
 assert(q(3,0,{km:'5.3',trips:'3'}).options[0].total===1950,'normal total');
 assert(q(3,0).options[0].unit===null,'unknown travel');
@@ -19,7 +19,7 @@ assert(q(3,0,{km:'30.1'}).travelKnown===false,'over 30');
 assert(q(3,0,{km:'5.31'}).error,'invalid km');
 assert(q(0,0).error&&q(-1,2).error,'invalid counts');
 assert(q(3,0,{med:'yes'}).options[0].fee===600&&q(3,0,{med:'yes'}).message.includes('藥品'),'med review');
-assert(q(3,0).message.includes('特殊檔期'),'holiday disclosure');
+assert(q(3,0).message.includes('特殊節慶'),'holiday disclosure');
 const custom=JSON.parse(JSON.stringify(defaultRates));custom.cat[1][1]=777;assert(inquiryQuote({c:3,d:0},custom).options[0].fee===777,'current rates');
 assert(q(0,1,{walk:'long',km:'5',trips:'3'}).options.every(x=>x.total===null),'long walk no full estimate');
 
