@@ -47,3 +47,5 @@ aside>button{margin:0 2px 3px 0}
 
 /* Compact overall workspace display; PDF canvas dimensions remain unchanged. */
 body{zoom:.8}
+
+.booking-editor{display:grid;gap:9px;margin:12px 0}.booking-calendar{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;text-align:center}.booking-calendar button{padding:4px;min-width:0}.booking-between{background:#EFEDF2!important}.booking-visit{display:grid;gap:7px;border:1px solid #DCD6E3;border-radius:12px;padding:12px;background:#faf9fc}.booking-time{flex:1;min-width:0}.booking-wheel{display:flex;gap:4px;position:relative;background:#EFEDF2;border-radius:9px}.booking-scroll{flex:1;height:96px;overflow-y:auto;scroll-snap-type:y mandatory;scrollbar-width:none;padding:32px 0;box-sizing:border-box;overscroll-behavior:contain}.booking-scroll button{display:block;width:100%;height:32px;min-height:32px;padding:0;scroll-snap-align:center;border:0;background:transparent}.booking-wheel:after{content:'';position:absolute;top:32px;left:0;right:0;height:32px;border-top:1px solid #DCD6E3;border-bottom:1px solid #DCD6E3;pointer-events:none}.booking-editor .row{flex-wrap:wrap}

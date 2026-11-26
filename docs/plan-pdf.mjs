@@ -1,5 +1,5 @@
-import {filename,careBlocks,serviceName} from './workspace-model.mjs?v=2.0.1126.4';
-import {brandDefaults,links,palette} from './brand.mjs?v=2.0.1126.4';
+import {filename,careBlocks,serviceName,bookingLines} from './workspace-model.mjs?v=2.0.1126.10';
+import {brandDefaults,links,palette} from './brand.mjs?v=2.0.1126.10';
 const W=794,H=1123,M=38,B=1060,inner=W-2*M;
 const clean=values=>values.filter(x=>typeof x==='string'&&x.trim());
 const sentence=value=>/[。！？.!?]$/.test(value.trim())?value.trim():value.trim()+'。';
@@ -127,7 +127,7 @@ export async function buildPDF(f,brand=brandDefaults){
   const width=inner/items.length;
   const cols=items.map(([title,body])=>{
    const heads=wrap(title,width-32,16,true);
-   return {heads,lines:body.flatMap(s=>wrap(s,width-32)),pos:0};
+   return {heads,lines:body.flatMap(s=>typeof s==='object'?wrap(s.note,width-32,12).map(t=>({note:t})):wrap(s,width-32)),pos:0};
   });
   if(cols.length>1){
    const heights=cols.map(col=>col.heads.length+col.lines.length);
@@ -155,7 +155,7 @@ export async function buildPDF(f,brand=brandDefaults){
     if(continued&&!parts[k].length)return;
     col.heads.forEach((t,j)=>text(t,x+16,y+25+inset+j*24,16,true,serviceTheme?goldInk:plum));
     const baseline=y+headHeight+19;
-    parts[k].forEach((s,j)=>text(s,x+16,baseline+j*lineHeight,15,false,serviceTheme?palette.promise.text:ink));
+    parts[k].forEach((s,j)=>typeof s==='object'?text(s.note,x+16,baseline+j*lineHeight,12,false,'#82735D'):text(s,x+16,baseline+j*lineHeight,15,false,serviceTheme?palette.promise.text:ink));
     col.pos+=parts[k].length;
    });
    y+=height+9;continued=true;remaining=cols.some(col=>col.pos<col.lines.length);
@@ -195,11 +195,11 @@ export async function buildPDF(f,brand=brandDefaults){
  }while(familyLines.length||notes.length);
  const care=careBlocks(f);
  const basics=[
-  ['陪伴毛孩的時間與細節',clean([f.booking.dates,f.booking.times,...f.booking.services.map(s=>serviceName(s,f.groups))])],
+  ['陪伴毛孩的時間與細節',[...bookingLines(f.booking,f.groups),{note:'關於抵達與照護時間：預計抵達時段為保姆到府的時間範圍，並非照護服務的起訖時間。每趟服務將自實際抵達後開始計算，並完整提供約定的照護時間。'}]],
   ['回家的方式與門鎖安全',clean([f.entry.pickup&&(/^(已取|已取得)$/.test(f.entry.pickup.trim())?'鑰匙已取得。':'取鑰匙：'+f.entry.pickup),f.entry.door,f.entry.return&&(/^(最後一趟放門內|最後一趟放回門內)$/.test(f.entry.return.trim())?'最後一趟將鑰匙放回門內。':'還鑰匙：'+f.entry.return)])],
   ['身體小狀況與特別照顧',care.filter(b=>b.id.endsWith('-health')).flatMap(b=>[b.title,...careText('health',f.groups[b.id.split('-')[0]].health)])]
  ].filter(([,ls])=>ls.length);
- rows(basics,3);
+ for(const item of basics){if(item[0]==='陪伴毛孩的時間與細節')row([item]);else row([item]);}
  const pets=Object.entries(f.groups).flatMap(([kind,g])=>g.pets.map(p=>[(kind==='cat'?'🐱 ':'🐶 ')+(p.name||'毛寶'),clean([petStory(p)])]));
  if(pets.length){section('毛孩的小個性與相處默契');rows(pets);}
  cover=false;page();
@@ -216,7 +216,7 @@ export async function buildPDF(f,brand=brandDefaults){
   for(const [key,title] of Object.entries(headings)){
    const block=care.find(b=>b.id===kind+'-'+key);
    const lines=block?careText(key,g[key]):[];
-   if(key==='toilet'&&kind==='cat')lines.push('爸爸媽媽出門前記得幫寶貝補足量的貓砂，讓他們更舒適上廁所喔！');
+   if(key==='toilet'&&kind==='cat')lines.push({note:'爸爸媽媽出門前記得幫寶貝補足量的貓砂，讓他們更舒適上廁所喔！'});
    if(lines.length)other.push([species+' '+title,lines]);
   }
  }
