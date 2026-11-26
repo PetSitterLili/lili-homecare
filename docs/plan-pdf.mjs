@@ -1,5 +1,5 @@
-import {filename,mediaLabel,careBlocks,warnings} from './workspace-model.mjs?v=2.0.1125.3';
-import {brandDefaults,links} from './brand.mjs?v=2.0.1125.3';
+import {filename,careBlocks,warnings} from './workspace-model.mjs?v=2.0.1126.1';
+import {brandDefaults,links} from './brand.mjs?v=2.0.1126.1';
 const W=794,H=1123,M=38,B=1060,inner=W-2*M;
 const clean=values=>values.filter(x=>typeof x==='string'&&x.trim());
 const sentence=value=>/[。！？.!?]$/.test(value.trim())?value.trim():value.trim()+'。';
@@ -16,49 +16,186 @@ function natural(line){
  return ['飼料品項','罐頭／餐包／鮮食品項','可給的零食','特殊交代','特殊交代／個別差異'].includes(k)?v:line;
 }
 async function art(name){const i=new Image();i.src=new URL('./assets/'+name+'.png',import.meta.url);await i.decode();return i;}
+const ink='#39323e', plum='#584960', lineColor='#d8d1db';
+const serif='"Lili Serif", "Noto Serif CJK TC", "Noto Color Emoji", serif';
+const sans='"Noto Sans CJK TC", "Noto Color Emoji", system-ui, sans-serif';
+const lineHeight=23;
+
 export async function buildPDF(f,brand=brandDefaults){
+ await document.fonts.load('700 18px "Lili Serif"','毛孩專屬照護計畫書');
  await document.fonts.ready;
  const [cat,ig,line]=await Promise.all(['cat','ig','line'].map(art));
- const pages=[];let c,ctx,y;
- function txt(str,x,pos,size=15,color='#393340',bold=false){ctx.font=(bold?'bold ':'')+size+'px "Noto Sans CJK TC", "Noto Color Emoji", sans-serif';ctx.fillStyle=color;ctx.fillText(str,x,pos);}
- function wrap(str,width){ctx.font='15px "Noto Sans CJK TC", "Noto Color Emoji", sans-serif';return String(str).split('\n').flatMap(s=>{const arr=[];let row='';for(const ch of s){if(row&&ctx.measureText(row+ch).width>width){arr.push(row);row='';}row+=ch;}return [...arr,row];});}
- function box(x,top,w,h,color){ctx.beginPath();ctx.roundRect(x,top,w,h,12);ctx.fillStyle=color;ctx.fill();}
- function page(){c=document.createElement('canvas');c.width=W*2;c.height=H*2;pages.push(c);ctx=c.getContext('2d');ctx.scale(2,2);ctx.fillStyle='white';ctx.fillRect(0,0,W,H);ctx.textAlign='center';txt('毛孩專屬照護計畫書',W/2,54,26,'#655970',true);txt('The Pet Sitter Lili',W/2,77,13,'#82728d');ctx.textAlign='left';txt('ㄌㄌ保姆  ·  '+pages.length,M,H-28,12,'#776e7c');y=96;}
- function cards(items,n=2){
- const width=(inner-(n-1)*12)/n;
- for(let j=0;j<items.length;j+=n){
- const group=items.slice(j,j+n).map(([title,lines])=>({title,rows:lines.flatMap(s=>wrap(s,width-28)),offset:0}));
- while(group.some(g=>g.rows.length>g.offset)){
- if(y+95>B)page();
- const cap=Math.floor((B-y-50)/23);
- let height=0;
- group.forEach((g,k)=>{const part=g.rows.slice(g.offset,g.offset+cap);if(!part.length)return;
- const x=M+k*(width+12),h=47+23*part.length;box(x,y,width,h,'#f7f5f8');box(x,y,width,33,'#e9e4ee');txt(g.title+(g.offset?'（續）':''),x+12,y+22,14,'#665972',true);part.forEach((s,i)=>txt(s,x+14,y+54+i*23));g.offset+=part.length;height=Math.max(height,h);});y+=height+12;
- }}}
- page();
- const bannerLines=clean([f.name,f.contact.name,f.contact.phone,f.contact.address,f.contact.emergency&&'緊急聯絡：'+f.contact.emergency,f.contact.guide,f.entry.wifi&&'WiFi：'+f.entry.wifi,f.media.note&&'影像分享備註：'+f.media.note]).flatMap(s=>wrap(s,inner-244));
- const first=bannerLines.splice(0,25),bh=Math.max(110,first.length*23+24);box(M,y,inner,bh,'#786b86');ctx.drawImage(cat,M+12,y+12,78,74);box(W-M-128,y+12,114,30,'#f1edf4');txt(mediaLabel(f),W-M-118,y+32,13,'#5d5067',true);first.forEach((s,i)=>txt(s,M+102,y+26+i*23,15,'white',i===0));y+=bh+14;
- if(bannerLines.length)cards([['家庭資訊（續）',bannerLines]],1);
+ const pages=[];
+ let ctx,c,y,cover=true;
+ function font(size,bold){return (bold?'700 ':'400 ')+size+'px '+(bold?serif:sans);}
+ function text(str,x,baseline,size=15,bold=false,color=ink){
+  ctx.font=font(size,bold);ctx.fillStyle=color;ctx.fillText(str,x,baseline);
+ }
+ function wrap(value,width,size=15,bold=false){
+  ctx.font=font(size,bold);
+  const out=[];
+  for(const paragraph of String(value).split(/\r?\n/)){
+   let row='';
+   for(const ch of paragraph){
+    if(row && ctx.measureText(row+ch).width>width){out.push(row);row='';}
+    row+=ch;
+   }
+   out.push(row);
+  }
+  return out;
+ }
+ function box(x,top,width,height,color,radius=10){
+  ctx.beginPath();ctx.roundRect(x,top,width,height,radius);
+  ctx.fillStyle=color;ctx.fill();
+ }
+ function rule(x,top,width,color=lineColor){ctx.fillStyle=color;ctx.fillRect(x,top,width,1);}
+ function page(first=false){
+  c=document.createElement('canvas');c.width=W*2;c.height=H*2;pages.push(c);
+  ctx=c.getContext('2d');ctx.scale(2,2);ctx.fillStyle='white';ctx.fillRect(0,0,W,H);
+  if(first){
+   ctx.textAlign='center';text('毛孩專屬照護計畫書',W/2,62,31,true,plum);
+   text('The Pet Sitter Lili',W/2,89,14,false,'#756b7b');ctx.textAlign='left';y=110;
+  }else{
+   text('ㄌㄌ保姆',M,48,17,true,plum);ctx.textAlign='right';
+   text('毛孩專屬照護計畫書',W-M,48,14,true,plum);ctx.textAlign='left';rule(M,63,inner);y=83;
+  }
+  rule(M,1080,inner);text('The Pet Sitter Lili',M,1103,12,false,plum);
+  ctx.textAlign='right';text(String(pages.length).padStart(2,'0'),W-M,1103,13,true,plum);ctx.textAlign='left';
+ }
+ function ensure(height){if(y+height>B)page();}
+ function section(title){
+  if(cover)y+=7;
+  ensure(116);text(title,M,y+24,21,true,plum);y+=37;rule(M,y,inner);y+=9;
+ }
+ // A row shares one surface and one bottom edge. Very uneven text uses full-width rows.
+ function rows(items,n=2){
+  for(let i=0;i<items.length;i+=n)row(items.slice(i,i+n));
+ }
+ function row(items){
+  if(!items.length)return;
+  const width=inner/items.length;
+  const cols=items.map(([title,body])=>{
+   const heads=wrap(title,width-32,16,true);
+   return {heads,lines:body.flatMap(s=>wrap(s,width-32)),pos:0};
+  });
+  if(cols.length>1){
+   const heights=cols.map(col=>col.heads.length+col.lines.length);
+   if(Math.max(...heights)>Math.max(7,Math.min(...heights)*2.5)){
+    for(const item of items)row([item]);
+    return;
+   }
+  }
+  let remaining=true,continued=false;
+  while(remaining){
+   const inset=cover?12:0;
+   const headHeight=inset+14+Math.max(...cols.map(col=>col.heads.length))*24;
+   const fullHeight=headHeight+22+lineHeight*Math.max(1,...cols.map(col=>col.lines.length-col.pos));
+   if(!continued && fullHeight<420 && y+fullHeight>B && y>140)page();
+   ensure(headHeight+22+lineHeight);
+   const capacity=Math.max(1,Math.floor((B-y-headHeight-22)/lineHeight));
+   const parts=cols.map(col=>col.lines.slice(col.pos,col.pos+capacity));
+   const height=headHeight+22+lineHeight*Math.max(1,...parts.map(p=>p.length));
+   box(M,y,inner,height,'#f8f7f9',9);
+   if(cover){ctx.fillStyle='#ddd6e1';ctx.fillRect(M+12,y+7,inner-24,2);}
+   cols.forEach((col,k)=>{
+    const x=M+k*width;
+    if(k){ctx.fillStyle='#dfd9e2';ctx.fillRect(x,y+12,1,height-24);}
+    if(continued&&!parts[k].length)return;
+    col.heads.forEach((t,j)=>text(t,x+16,y+25+inset+j*24,16,true,plum));
+    const baseline=y+headHeight+19;
+    parts[k].forEach((s,j)=>text(s,x+16,baseline+j*lineHeight));
+    col.pos+=parts[k].length;
+   });
+   y+=height+9;continued=true;remaining=cols.some(col=>col.pos<col.lines.length);
+  }
+ }
+ page(true);
+ // The consent panel stays beside the family at every length, including a multi-page note.
+ const label={yes:'我願意分享',no:'我不願意分享'}[f.media.status]||'尚未確認';
+ const copy=clean([f.contact.name,f.contact.phone,f.contact.address,f.contact.guide,
+  f.entry.wifi&&'WiFi　'+f.entry.wifi,f.contact.emergency&&'緊急聯絡　'+f.contact.emergency]);
+ const panelW=214,logo=70,pad=18,detailX=M+pad+logo+16;
+ const detailWidth=inner-panelW-logo-pad*3-16;
+ const familyLines=[...wrap(f.name||'家庭資料',detailWidth,21,true).map(t=>[t,21,true]),
+  ...copy.flatMap(s=>wrap(s,detailWidth,14).map(t=>[t,14,false]))];
+ const notes=f.media.note?.trim()?wrap(f.media.note,panelW-32,14):[];
+ let firstBanner=true;
+ do{
+  if(!firstBanner)page();
+  const capacity=Math.floor((B-y-82)/24);
+  const details=familyLines.splice(0,capacity);
+  const part=notes.splice(0,capacity);
+  const panelH=part.length?90+part.length*22:61;
+  const height=Math.max(124,pad*2+details.length*24,pad*2+panelH);
+  box(M,y,inner,height,'#dfdbe3',15);
+  const logoY=y+(Math.min(height,160)-logo)/2;
+  ctx.drawImage(cat,M+pad,logoY,logo,logo*cat.height/cat.width);
+  details.forEach(([t,size,b],j)=>text(t,detailX,y+pad+20+j*24,size,b,plum));
+  const px=W-M-panelW-pad,py=y+pad;
+  box(px,py,panelW,panelH,'#fcfbfd',10);
+  text('服務影像對外分享',px+16,py+20,12,false,plum);
+  text(label,px+16,py+46,20,true,f.media.status==='no'?'#694957':plum);
+  if(part.length){
+   rule(px+16,py+56,panelW-32);text('拍攝與分享備註',px+16,py+76,12,true,plum);
+   part.forEach((s,i)=>text(s,px+16,py+97+22*i,14));
+  }
+  y+=height+19;firstBanner=false;
+ }while(familyLines.length||notes.length);
  const care=careBlocks(f);
- cards([['陪伴毛孩的時間與細節',clean([f.booking.dates,f.booking.times,...f.booking.services])],['回家的方式與門鎖安全',clean([f.entry.pickup&&'取鑰匙：'+f.entry.pickup,f.entry.door,f.entry.return&&'歸還：'+f.entry.return])],['身體小狀況與特別照顧',care.filter(b=>b.id.endsWith('-health')).flatMap(b=>[b.title,...b.lines])]].filter(x=>x[1].length),3);
- const pets=Object.entries(f.groups).flatMap(([k,g])=>g.pets.map(p=>[(k==='cat'?'🐱 ':'🐶 ')+(p.name||'毛寶'),[petStory(p)]]));
- if(pets.length){if(y+110>B)page();txt('毛孩的小個性與相處默契',M,y+20,18,'#665972',true);y+=32;cards(pets);}
- 
+ const basics=[
+  ['陪伴毛孩的時間與細節',clean([f.booking.dates,f.booking.times,...f.booking.services])],
+  ['回家的方式與門鎖安全',clean([f.entry.pickup&&'取鑰匙：'+f.entry.pickup,f.entry.door,f.entry.return&&'歸還：'+f.entry.return])],
+  ['身體小狀況與特別照顧',care.filter(b=>b.id.endsWith('-health')).flatMap(b=>[b.title,...b.lines])]
+ ].filter(([,ls])=>ls.length);
+ rows(basics,3);
+ const pets=Object.entries(f.groups).flatMap(([kind,g])=>g.pets.map(p=>[(kind==='cat'?'🐱 ':'🐶 ')+(p.name||'毛寶'),clean([petStory(p)])]));
+ if(pets.length){section('毛孩的小個性與相處默契');rows(pets);}
+ cover=false;page();
  const foods=care.filter(b=>/-(dry|wet|snack)$/.test(b.id));
- if(foods.length){if(y+120>B)page();txt('每一餐的份量與愛吃的口味',M,y+20,18,'#665972',true);y+=32;cards(foods.map(b=>[b.title,b.lines.map(natural)]),foods.length<3?foods.length:3);}
+ if(foods.length){section('每一餐的份量與愛吃的口味');
+  for(const kind of Object.keys(f.groups)){
+   rows(foods.filter(b=>b.id.startsWith(kind+'-')).map(b=>[b.title,b.lines.map(natural)]),3);
+  }
+ }
  const headings={water:'隨時隨地乾淨清爽的飲水',wash:'洗滌用品與位置',toilet:'如廁環境清潔與代謝觀察',play:'放鬆心情的玩耍與陪伴',walk:'散步與返家整理'};
- const other=care.filter(b=>headings[b.id.split('-')[1]]).map(b=>[b.title.slice(0,2)+' '+headings[b.id.split('-')[1]],b.lines.map(natural)]);
- if(f.groups.cat)other.push(['如廁小提醒',['爸爸媽媽出門前記得幫寶貝補足量的貓砂，讓他們更舒適上廁所喔！']]);
- if(f.environment)other.push(['舒適空間控制與電器使用',[f.environment]]);if(f.extra)other.push(['爸爸媽媽交代的貼心任務',[f.extra]]);
- cards(other);const w=warnings(f);if(w.length)cards([['待確認事項',w]],1);
+ const other=[];
+ for(const [kind,g] of Object.entries(f.groups)){
+  const species=kind==='cat'?'🐱':'🐶';
+  for(const [key,title] of Object.entries(headings)){
+   const block=care.find(b=>b.id===kind+'-'+key);
+   const lines=block?block.lines.map(natural):[];
+   if(key==='toilet'&&kind==='cat')lines.push('爸爸媽媽出門前記得幫寶貝補足量的貓砂，讓他們更舒適上廁所喔！');
+   if(lines.length)other.push([species+' '+title,lines]);
+  }
+ }
+ if(f.environment)other.push(['舒適空間控制與電器使用',[f.environment]]);
+ if(f.extra)other.push(['爸爸媽媽交代的貼心任務',[f.extra]]);
+ if(other.length){section('日常照護安排');rows(other);}
+ const warningsList=warnings(f);if(warningsList.length)rows([['待確認事項',warningsList]]);
  if(brand.service.trim()){
- if(y+170>B)page();txt('♡ 每一次陪伴，都是一份安心的交付',M,y+20,18,'#665972',true);y+=34;
- const sections=brand.service.trim().split(/\n\s*\n/).map(part=>{const [title,...body]=part.split('\n');return body.length&&title.length<=20?[title,body]:['服務約定',[part]];});cards(sections,2);}
- if(brand.promise)cards([['給家長的安心承諾',[brand.promise]]],1);
- if(y+112>B)page();if(brand.contact){
- const contactLines=wrap(brand.contact,inner-230);if(contactLines.length<=4){box(M,y,inner,108,'#f7f5f8');txt('與ㄌㄌ聯繫',M+12,y+25,16,'#665972',true);contactLines.forEach((s,i)=>txt(s,M+12,y+49+i*20,14));}
- else cards([['與ㄌㄌ聯繫',[brand.contact]]],1);}
- if(y+100>B)page();c.links=[];[ig,line].forEach((img,i)=>{const x=W-M-195+i*98;ctx.drawImage(img,x,y,76,76);txt(i?'LINE 加好友':'Instagram',x,y+93,12);c.links.push({x,y,url:links[i]});});
+  // Keep the four standard service notes together when they would otherwise straddle pages.
+  const bodyHeight=brand.service.trim().split(/\n\s*\n/).reduce((sum,part)=>{
+   const lines=part.split('\n').slice(1).flatMap(t=>wrap(t,inner/2-32));
+   return sum+60+lines.length*lineHeight;
+  },0)/2;
+  if(y>B*.54&&bodyHeight+120>B-y)page();
+  section('♡ 每一次陪伴，都是一份安心的交付');
+  const sections=brand.service.trim().split(/\n\s*\n/).map(part=>{
+   const [title,...body]=part.split('\n');
+   return body.length&&title.length<=20?[title,body]:['服務約定',[part]];
+  });
+  rows(sections);
+ }
+ if(brand.promise)rows([['給家長的安心承諾',[brand.promise]]]);
+ const contact=brand.contact?wrap(brand.contact,inner-220):[];
+ if(contact.length>4)rows([['與ㄌㄌ聯繫',[brand.contact]]]);
+ ensure(118);rule(M,y,inner);text('與ㄌㄌ聯繫',M+4,y+32,18,true,plum);
+ if(contact.length<=4)contact.forEach((s,i)=>text(s,M+4,y+56+i*20,14));
+ c.links=[];[ig,line].forEach((img,i)=>{
+  const x=W-M-192+i*98,top=y+8;
+  ctx.drawImage(img,x,top,75,75);text(i?'LINE 加好友':'Instagram',x,top+94,13,false,plum);
+  c.links.push({x,y:top,url:links[i]});
+ });
  const encoder=new TextEncoder(),parts=[],offsets=[0];let length=0;
  const bytes=s=>{const a=typeof s==='string'?encoder.encode(s):s;parts.push(a);length+=a.length;};
  const object=(id,content)=>{offsets[id]=length;bytes(id+' 0 obj\n');bytes(content);bytes('\nendobj\n');};

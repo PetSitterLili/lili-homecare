@@ -1,8 +1,8 @@
 // Keep only the public application shell offline. Family data lives in IndexedDB.
-const cacheName = 'lili-homecare-shell-2.0.1125.3';
+const cacheName = 'lili-homecare-shell-2.0.1126.1';
 const scope = self.registration.scope;
-const build = '?v=2.0.1125.3';
-const paths = ['index.html','manifest.webmanifest','config.js',
+const build = '?v=2.0.1126.1';
+const paths = ['assets/lili-serif.woff2','index.html','manifest.webmanifest','config.js',
   ...['workspace.css','workspace.mjs','workspace-model.mjs','model.mjs','brand.mjs','tab-grant.mjs','drive.mjs','drafts.mjs','plan-pdf.mjs'].map(p => p+build),
   ...['cat','ig','line','icon-192','icon-512'].map(name => 'assets/'+name+'.png')];
 const urls = new Set(paths.map(path => new URL(path,scope).href));
@@ -14,7 +14,7 @@ self.addEventListener('fetch', event => {
   const page=new URL(req.url);
   const index=new URL('index.html',scope).href;
   if(req.mode==='navigate'&&(page.href.split('?')[0]===scope||page.href.split('?')[0]===index)){
-    event.respondWith(fetch(req).catch(()=>caches.open(cacheName).then(cache=>cache.match(index))));return;
+    event.respondWith(caches.open(cacheName).then(async cache=>(await cache.match(index))||fetch(req)));return;
   }
   if(urls.has(req.url))event.respondWith(caches.open(cacheName).then(async cache => (await cache.match(req))||fetch(req)));
 });
