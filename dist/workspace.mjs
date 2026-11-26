@@ -1,13 +1,13 @@
-import {inspectCarePatch,applyCarePatch} from './care-patch.mjs?v=2.0.1126.45';
-import {rememberGrant,recallGrant,forgetGrant} from './tab-grant.mjs?v=2.0.1126.45';
-import {displayQuoteLabel,legacyQuoteReference,oldBookingText,hasCurrentBooking,inquiryQuote,mixedPlan,mixedCare,mixedService,defaultRates,readRates,days,travel,rate,holidayRows,quoteKey,savedQuote,quoteLines,money,overtimeText} from './quote.mjs?v=2.0.1126.45';
-import {brandDefaults,readBrand} from './brand.mjs?v=2.0.1126.45';
+import {inspectCarePatch,applyCarePatch} from './care-patch.mjs?v=2.0.1126.46';
+import {rememberGrant,recallGrant,forgetGrant} from './tab-grant.mjs?v=2.0.1126.46';
+import {displayQuoteLabel,legacyQuoteReference,oldBookingText,hasCurrentBooking,inquiryQuote,mixedPlan,mixedCare,mixedService,defaultRates,readRates,days,travel,rate,holidayRows,quoteKey,savedQuote,quoteLines,money,overtimeText} from './quote.mjs?v=2.0.1126.46';
+import {brandDefaults,readBrand} from './brand.mjs?v=2.0.1126.46';
 
-import {validReservation,reservationPeriods,readLineReservations,reservationLines,reservationSegments,inspectLineReservations,applyLineReservations,sortFamilyDirectory,validServiceDate,taipeiDate,nextBookingDate,orderUpcomingFamilies,recentFamilyIds,profileStages,safeProfileUrl,readProfile,familyArea,profileAge,matchesProfile,prepareProfilePatch,applyProfilePatch,bookingDateGroups,replaceBookingDates,bookingDateLabel,lineHistory,prepareLineHistory,applyLineHistory,syncOverview,matchesFamily,prepareLegacyBatch,noteSpecs,noteRows,writeNoteRows,noteCycle,noteActive,bindPendingNotes,activeFamily,bookingSegments,bookingLines,serviceName,fresh,blanks,fields,titles,day,filename,mediaLabel,warnings,publicBlocks,tasks,sourceKey,normalize,migrate} from './workspace-model.mjs?v=2.0.1126.45';
-import {makeText as legacyText} from './model.mjs?v=2.0.1126.45';
-import {DriveStore,digest} from './drive.mjs?v=2.0.1126.45';
-import {openDB,storeDB} from './drafts.mjs?v=2.0.1126.45';
-import {buildPDF,auditLegacyCoverage} from './plan-pdf.mjs?v=2.0.1126.45';
+import {validReservation,reservationPeriods,readLineReservations,reservationLines,reservationSegments,inspectLineReservations,applyLineReservations,sortFamilyDirectory,validServiceDate,taipeiDate,nextBookingDate,orderUpcomingFamilies,recentFamilyIds,profileStages,safeProfileUrl,readProfile,familyArea,profileAge,matchesProfile,prepareProfilePatch,applyProfilePatch,bookingDateGroups,replaceBookingDates,bookingDateLabel,lineHistory,prepareLineHistory,applyLineHistory,syncOverview,matchesFamily,prepareLegacyBatch,noteSpecs,noteRows,writeNoteRows,noteCycle,noteActive,bindPendingNotes,activeFamily,bookingSegments,bookingLines,serviceName,fresh,blanks,fields,titles,day,filename,mediaLabel,warnings,publicBlocks,tasks,sourceKey,normalize,migrate} from './workspace-model.mjs?v=2.0.1126.46';
+import {makeText as legacyText} from './model.mjs?v=2.0.1126.46';
+import {DriveStore,digest} from './drive.mjs?v=2.0.1126.46';
+import {openDB,storeDB} from './drafts.mjs?v=2.0.1126.46';
+import {buildPDF,auditLegacyCoverage} from './plan-pdf.mjs?v=2.0.1126.46';
 const $=id=>document.getElementById(id),drive=new DriveStore(),db=storeDB(await openDB().catch(error=>{$('main').innerHTML='<div class="panel"><h1>目前無法啟用草稿保存</h1><p>此瀏覽器未能開啟本機資料庫，請換外部瀏覽器或檢查儲存空間；尚未開放填寫，避免資料遺失。</p></div>';throw error;}));
 let records=await db.all(),entry=null,view='service',kind='cat',petIndex=0,undo=[],syncTimer,localChain=Promise.resolve(),syncBusy=false,photoBusy=false,pdf=null,photoUrl=null,localFailure=false;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -395,14 +395,14 @@ async function importLegacy(file){
   const dlg=document.createElement('dialog');dlg.className='crm-modal';
   const title=document.createElement('h2');title.textContent='舊客批次匯入預覽';
   const desc=document.createElement('p');desc.textContent='可新增 '+plan.accepted.length+' 戶，略過 '+plan.skipped.length+' 戶。只新增、不覆蓋；全部標記舊資料待複核。';
-  dlg.append(title,desc);
+  dlg.append(desc);
   const details=document.createElement('div');details.className='legacy-preview';
   for(const f of plan.accepted){const p=document.createElement('p');p.textContent='新增｜'+f.name;details.append(p);}
   for(const s of plan.skipped){const p=document.createElement('p');p.textContent='略過｜'+s.name+'：'+s.reason;details.append(p);}
   dlg.append(details);
   const actions=document.createElement('div');actions.className='row';
   const proceed=button('確認匯入 '+plan.accepted.length+' 戶',()=>dlg.close('yes'),'primary');proceed.disabled=!plan.accepted.length;
-  actions.append(button('取消',()=>dlg.close('no')),proceed);dlg.append(actions);document.body.append(dlg);
+  const cancel=button('取消',()=>dlg.close('no'));actions.append(cancel,proceed);dlg.prepend(dialogCloseHeader(dlg,title,cancel));dlg.append(actions);document.body.append(dlg);
   const answer=await new Promise(resolve=>{dlg.addEventListener('close',()=>resolve(dlg.returnValue==='yes'),{once:true});dlg.showModal();});dlg.remove();
   if(!answer)return;
   if(!ready())throw Error('雲端連線已失效，請重新連接後再匯入');
@@ -567,7 +567,7 @@ function wireMenu(){
  $('menuQuote').onclick=()=>quickInquiry();
 }
 
-wireMenu();wireFamilyPages();$('familyPrev').onclick=()=>turnFamilyPage(-1);$('familyNext').onclick=()=>turnFamilyPage(1);$('syncIndicator').onclick=openSyncDetail;$('quickQuote').onclick=()=>quickInquiry();$('new').onclick=()=>profileDialog(null);$('filterFamilies').onclick=filterDialog;$('clearFamilyFilters').onclick=()=>{familyFilters={};list();};$('upcomingFamilies').onclick=()=>{const current=familyFilters.booking;const only=Array.isArray(current)?current.length===1&&current[0]==='upcoming':current==='upcoming';if(only)delete familyFilters.booking;else familyFilters.booking=['upcoming'];list();};$('clearRecentFamilySearch').onclick=()=>{saveRecentSearch(null);renderRecentSearch();};$('profileImport').onclick=()=>$('profileFile').click();$('profileFile').onchange=e=>{if(e.target.files[0])importProfiles(e.target.files[0]);};$('demo').onclick=()=>newRecord(true);$('familySort').onchange=()=>{familySort=$('familySort').value;list();};$('search').oninput=()=>{list();};$('families').onclick=e=>{settleFamilyPage();const menu=e.target.closest('[data-risk-menu]');if(menu){e.stopPropagation();riskMenu(records.find(r=>r.id===menu.dataset.riskMenu));return;}const b=e.target.closest('[data-id]');if(b){if(photoBusy){toast('請等待照片保存完成');return;}if(!archiveView&&$('search').value.trim())saveRecentSearch(b.dataset.id);openRecord(b.dataset.id);}};$('cloud').onclick=()=>{$('clientId').value=window.LILI_CONFIG?.googleClientId||localStorage.getItem('liliOAuthClientId')||'';$('setup').showModal();};$('closeSetup').onclick=()=>$('setup').close();$('connectSetup').onclick=()=>connect();$('lineHistoryImport').onclick=()=>$('lineHistoryFile').click();$('lineHistoryFile').onchange=e=>{if(e.target.files[0])importLineHistory(e.target.files[0]);};$('legacyImport').onclick=()=>$('legacyImportFile').click();$('legacyImportFile').onchange=e=>{if(e.target.files[0])importLegacy(e.target.files[0]);};$('restore').onclick=()=>$('restoreFile').click();$('restoreFile').onchange=e=>{if(e.target.files[0])restore(e.target.files[0]);};$('photoFiles').onchange=e=>addPhotos([...e.target.files]);$('closePhoto').onclick=()=>$('lightbox').close();$('lightbox').onclose=()=>{if(photoUrl)URL.revokeObjectURL(photoUrl);photoUrl=null;$('fullPhoto').removeAttribute('src');};window.addEventListener('online',()=>{if(ready())schedule();else resumeConnection();status();});window.addEventListener('offline',status);window.addEventListener('beforeunload',e=>{if(localFailure||photoBusy||[...pending.values()].some(Boolean)){e.preventDefault();e.returnValue='';}});list();const last=await db.get('settings','lastFamily');if(last&&records.some(r=>r.id===last&&!r.f.archived))await openRecord(last);
+wireStaticCloseHeaders();wireMenu();wireFamilyPages();$('familyPrev').onclick=()=>turnFamilyPage(-1);$('familyNext').onclick=()=>turnFamilyPage(1);$('syncIndicator').onclick=openSyncDetail;$('quickQuote').onclick=()=>quickInquiry();$('new').onclick=()=>profileDialog(null);$('filterFamilies').onclick=filterDialog;$('clearFamilyFilters').onclick=()=>{familyFilters={};list();};$('upcomingFamilies').onclick=()=>{const current=familyFilters.booking;const only=Array.isArray(current)?current.length===1&&current[0]==='upcoming':current==='upcoming';if(only)delete familyFilters.booking;else familyFilters.booking=['upcoming'];list();};$('clearRecentFamilySearch').onclick=()=>{saveRecentSearch(null);renderRecentSearch();};$('profileImport').onclick=()=>$('profileFile').click();$('profileFile').onchange=e=>{if(e.target.files[0])importProfiles(e.target.files[0]);};$('demo').onclick=()=>newRecord(true);$('familySort').onchange=()=>{familySort=$('familySort').value;list();};$('search').oninput=()=>{list();};$('families').onclick=e=>{settleFamilyPage();const menu=e.target.closest('[data-risk-menu]');if(menu){e.stopPropagation();riskMenu(records.find(r=>r.id===menu.dataset.riskMenu));return;}const b=e.target.closest('[data-id]');if(b){if(photoBusy){toast('請等待照片保存完成');return;}if(!archiveView&&$('search').value.trim())saveRecentSearch(b.dataset.id);openRecord(b.dataset.id);}};$('cloud').onclick=()=>{$('clientId').value=window.LILI_CONFIG?.googleClientId||localStorage.getItem('liliOAuthClientId')||'';$('setup').showModal();};$('closeSetup').onclick=()=>$('setup').close();$('connectSetup').onclick=()=>connect();$('lineHistoryImport').onclick=()=>$('lineHistoryFile').click();$('lineHistoryFile').onchange=e=>{if(e.target.files[0])importLineHistory(e.target.files[0]);};$('legacyImport').onclick=()=>$('legacyImportFile').click();$('legacyImportFile').onchange=e=>{if(e.target.files[0])importLegacy(e.target.files[0]);};$('restore').onclick=()=>$('restoreFile').click();$('restoreFile').onchange=e=>{if(e.target.files[0])restore(e.target.files[0]);};$('photoFiles').onchange=e=>addPhotos([...e.target.files]);$('closePhoto').onclick=()=>$('lightbox').close();$('lightbox').onclose=()=>{if(photoUrl)URL.revokeObjectURL(photoUrl);photoUrl=null;$('fullPhoto').removeAttribute('src');};window.addEventListener('online',()=>{if(ready())schedule();else resumeConnection();status();});window.addEventListener('offline',status);window.addEventListener('beforeunload',e=>{if(localFailure||photoBusy||[...pending.values()].some(Boolean)){e.preventDefault();e.returnValue='';}});list();const last=await db.get('settings','lastFamily');if(last&&records.some(r=>r.id===last&&!r.f.archived))await openRecord(last);
 
 $('archive').onclick=()=>returnDirectory({archive:!archiveView});
 $('brandEdit').onclick=()=>{for(const key of Object.keys(brandDefaults))$(key).value=brand[key];$('brandStatus').textContent=brandState.error|| (brandState.dirty?'已存本機，等待雲端同步':brandState.remote?'已同步至 Drive':'此裝置的設定');$('brandDialog').showModal();};
@@ -657,7 +657,18 @@ function bookingEditor(b,groups,imported=null){
 
 function labelText(e,t){const m=String(t).match(/^(.*?)([（(][^（）()]+[）)])$/s);if(m&&m[1].trim())e.append(document.createTextNode(m[1]),crmEl('small',m[2],'label-qualifier'));else e.append(document.createTextNode(t));return e;}
 function crmEl(tag,t='',cl=''){const e=document.createElement(tag);e.textContent=t;e.className=cl;return e;}
-function crmDialog(title,body){const d=crmEl('dialog','','crm-modal');d.append(heading(title),body,button('關閉／取消',()=>d.close()));d.addEventListener('close',()=>{if(!d.open)d.remove();});const show=d.showModal.bind(d);d.showModal=()=>{if(!d.isConnected)document.body.append(d);show();};return keepDialogPosition(d);}
+function dialogCloseHeader(d,title,cancel){
+ const header=crmEl('div','','dialog-close-header');
+ const x=button('×',()=>{if(d.open&&!cancel.disabled)cancel.click();},'dialog-close-x');
+ x.setAttribute('aria-label','關閉視窗');x.title='關閉視窗';header.append(title,x);return header;
+}
+function wireStaticCloseHeaders(){
+ for(const [id,cancelId] of [['confirm','cancelConfirm'],['brandDialog','brandClose'],['setup','closeSetup']]){
+  const d=$(id),title=d.querySelector(':scope > h2');if(!title)continue;
+  const header=dialogCloseHeader(d,title,$(cancelId));d.prepend(header);
+ }
+}
+function crmDialog(title,body){const d=crmEl('dialog','','crm-modal'),cancel=button('關閉／取消',()=>d.close());d.append(dialogCloseHeader(d,heading(title),cancel),body,cancel);d.addEventListener('close',()=>{if(!d.open)d.remove();});const show=d.showModal.bind(d);d.showModal=()=>{if(!d.isConnected)document.body.append(d);show();};return keepDialogPosition(d);}
 function crmInput(parent,label,value='',type='number',step='1'){const l=labelText(crmEl('label'),label);const i=crmEl('input');i.type=type;if(type==='number')i.step=step;i.value=value;l.append(i);parent.append(l);return i;}
 function crmCheck(parent,label,value){const l=crmEl('label');const i=crmEl('input');i.type='checkbox';i.checked=value;l.append(i,document.createTextNode(label));parent.append(l);return i;}
 
