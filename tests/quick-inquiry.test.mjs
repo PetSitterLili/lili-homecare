@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {inquiryQuote,defaultRates} from '../docs/quote.mjs';
+import {inquiryQuote,defaultRates,legacyQuoteReference,oldBookingText,hasCurrentBooking,mixedPlan} from '../docs/quote.mjs';
 
 const q=(c,d,more={})=>inquiryQuote({c,d,...more},defaultRates);
 assert(q(3,0).options.map(x=>[x.fee,x.min]).flat().join(',')==='600,45,950,60','3 cats two plans');
@@ -22,3 +22,18 @@ assert(q(3,0,{med:'yes'}).options[0].fee===600&&q(3,0,{med:'yes'}).message.inclu
 assert(q(3,0).message.includes('特殊檔期'),'holiday disclosure');
 const custom=JSON.parse(JSON.stringify(defaultRates));custom.cat[1][1]=777;assert(inquiryQuote({c:3,d:0},custom).options[0].fee===777,'current rates');
 assert(q(0,1,{walk:'long',km:'5',trips:'3'}).options.every(x=>x.total===null),'long walk no full estimate');
+
+
+{
+ const v=inquiryQuote({c:3,d:0,km:'5.3'},defaultRates);
+ assert(v.message.includes('NT$650')&&v.message.includes('NT$1,000'),'inclusive customer quote');
+ assert(!v.message.includes('NT$600')&&!v.message.includes('NT$950')&&!v.message.includes('NT$50／'),'no base or travel breakout');
+ assert(!inquiryQuote({c:3,d:0},defaultRates).message.includes('NT$'),'unknown travel no numeric quote');
+ assert(inquiryQuote({c:0,d:1,walk:'yes',km:'5.3'},defaultRates).message.includes('NT$650'),'dog recommended');
+ assert(!inquiryQuote({c:0,d:1,walk:'long',km:'5.3'},defaultRates).message.includes('NT$'),'long walk no misleading total');
+ const a=legacyQuoteReference(3,0,'生活照顧',30,defaultRates);assert(a.nearest.min===45&&a.basis.fee===600&&a.estimate===400,'old 30 min reference only');
+ const b=legacyQuoteReference(2,2,mixedPlan,60,defaultRates);assert(b.nearest.min===75&&b.estimate===1040,'mixed 60 reference');
+ assert(legacyQuoteReference(6,1,mixedPlan,60,defaultRates)===null,'manual mixed not fabricated');
+ assert(oldBookingText({importOriginal:'【本次預約方案與日期時間】\n30分鐘\n【其他】\n無'})==='30分鐘','legacy read');
+ assert(!hasCurrentBooking([{b:'2026-11-25'}],'2026-11-26')&&hasCurrentBooking([{b:'2026-11-26'}],'2026-11-26'),'past route');
+}

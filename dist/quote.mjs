@@ -13,7 +13,7 @@ export function readRates(s){const r=JSON.parse(s);for(const k of ['cat','dog','
 export const quoteKey=f=>JSON.stringify([f.booking.segments||[],f.groups.cat?.pets.length||0,f.groups.dog?.pets.length||0]);
 export function savedQuote(f){try{const q=JSON.parse(f.booking.quote||'null');return q&&Array.isArray(q.rows)&&Array.isArray(q.holidays)&&Number.isFinite(q.total)?q:null;}catch{return null;}}
 export const money=n=>'NT$'+n.toLocaleString('en-US');
-export function quoteLines(f){const q=savedQuote(f);if(!q||q.key!==quoteKey(f))return [];return [...q.rows.map(x=>(f.groups.cat&&f.groups.dog&&mixedService(x.k?.split('|')[0])?x.min+' 分鐘'+mixedPlan:x.label)+'｜'+money(x.unit)+' × '+x.n+' 趟 = '+money(x.unit*x.n)),...(q.adjust?[q.adjust<0?'優惠折抵：'+money(-q.adjust):'額外服務費：'+money(q.adjust)]:[]),...(!q.exclude?q.holidays.map(h=>h.name+' '+(h.spans?.join('、')||h.a+'～'+h.b)+'｜'+money(h.fee)+' × '+h.n+' 趟 = '+money(h.total)):[]),'本次照護費用合計：'+money(q.total),'以上已含每趟車馬費 '+money(q.travel)+'（單程 '+q.km+' 公里）。'];}
+export function quoteLines(f){const q=savedQuote(f);if(!q||q.key!==quoteKey(f))return [];return [...q.rows.map(x=>(f.groups.cat&&f.groups.dog&&mixedService(x.k?.split('|')[0])?x.min+' 分鐘'+mixedPlan:x.label)+'｜'+money(x.unit)+' × '+x.n+' 趟 = '+money(x.unit*x.n)),...(q.adjust?[q.adjust<0?'優惠折抵：'+money(-q.adjust):'額外服務費：'+money(q.adjust)]:[]),...(!q.exclude?q.holidays.map(h=>h.name+' '+(h.spans?.join('、')||h.a+'～'+h.b)+'｜'+money(h.fee)+' × '+h.n+' 趟 = '+money(h.total)):[]),'本次照護費用合計：'+money(q.total),'以上費用已含車馬費。'];}
 export function overtimeText(b){return b.overtime===true&&Number(b.overtimeFee)>0?'每趟照護皆以完成雙方原先約定的照護內容為原則。若因毛寶突發嘔吐、環境需額外清整、健康異常或其他臨時狀況，而有必要延長照護時間，將視現場情況與家長聯繫，並依每 15 分鐘 NT$'+Number(b.overtimeFee).toLocaleString('en-US')+' 計收加時照護費用。如遇緊急狀況，將優先以毛寶的健康與安全為考量。':'';}
 
 export function inquiryQuote(input,r=defaultRates){
@@ -46,12 +46,30 @@ export function inquiryQuote(input,r=defaultRates){
  if(med==='unknown')result.warnings.push('如有餵藥或特殊健康照護需求，請事先告知。');
  if(kmRaw&&tv===null)result.warnings.push('單程 30.1 公里以上，車馬費另行評估。');
  const lines=['您好～依目前'+[c?c+' 位喵寶':'',d?d+' 位犬寶':''].filter(Boolean).join('＋')+'的家庭配置，先提供以下方案供您參考：'];
- for(const o of result.options){
-  lines.push('',(o.recommended?'推薦｜':o.reference?'參考｜':'')+o.title,o.min+' 分鐘｜'+money(o.fee)+'／趟（不含車馬費）',o.detail);
-  if(o.unit!==null)lines.push('含車馬費 '+money(o.unit)+'／趟'+(o.total!==null?'；預估 '+trips+' 趟共 '+money(o.total):''));
+ const visible=result.options.filter(o=>!o.reference);
+ for(const o of visible){
+  lines.push('',(o.recommended?'推薦｜':'')+o.title,o.min+' 分鐘'+(o.unit!==null?'｜'+money(o.unit)+'／趟':''),o.detail);
+  if(o.total!==null)lines.push('預估 '+trips+' 趟共 '+money(o.total));
  }
- if(result.options.length)lines.push('',result.travelKnown?'車馬費：單程 '+km+' 公里，每趟 '+money(tv)+'。':'車馬費依實際單程機車導航距離另計。');
+ if(visible.length)lines.push('',result.travelKnown?'以上費用皆已含車馬費。':kmRaw?'服務距離需個別確認，確認後提供含車馬費的完整報價。':'請提供服務地址或所在區域，確認距離後提供含車馬費的完整報價。');
  if(result.warnings.length)lines.push('',...result.warnings);
  lines.push('','以上為一般檔期初步詢價，特殊檔期加價、實際服務時間及承接情況，待確認日期與照護需求後另行確認。');
  result.message=lines.join('\n');return result;
 }
+
+export function legacyQuoteReference(c,d,service,minutes,r=defaultRates){
+ const m=Number(minutes);
+ if(!Number.isSafeInteger(m)||m<1||m>720)return null;
+ const options=inquiryQuote({c,d,med:'no'},r).options;
+ if(!options.length)return null;
+ const same=options.find(o=>o.service===service);
+ const nearest=[...options].sort((a,b)=>Math.abs(a.min-m)-Math.abs(b.min-m)||(same===a?-1:same===b?1:0)||a.min-b.min)[0];
+ const basis=same||nearest;
+ return {nearest,basis,estimate:Math.round(basis.fee*m/basis.min),hourly:Math.round(basis.fee*60/basis.min),sameService:!!same};
+}
+export function oldBookingText(f){
+ const s=typeof f.importOriginal==='string'?f.importOriginal:'';
+ const m=s.match(/【本次預約方案與日期時間】\s*([\s\S]*?)(?=\n【|$)/);
+ return m?m[1].trim():'';
+}
+export function hasCurrentBooking(rs,today){return rs.some(s=>s.b>=today);}

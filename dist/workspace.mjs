@@ -1,12 +1,12 @@
-import {rememberGrant,recallGrant,forgetGrant} from './tab-grant.mjs?v=2.0.1126.17';
-import {inquiryQuote,mixedPlan,mixedCare,mixedService,defaultRates,readRates,days,travel,rate,holidayRows,quoteKey,savedQuote,quoteLines,money,overtimeText} from './quote.mjs?v=2.0.1126.17';
-import {brandDefaults,readBrand} from './brand.mjs?v=2.0.1126.17';
+import {rememberGrant,recallGrant,forgetGrant} from './tab-grant.mjs?v=2.0.1126.18';
+import {legacyQuoteReference,oldBookingText,hasCurrentBooking,inquiryQuote,mixedPlan,mixedCare,mixedService,defaultRates,readRates,days,travel,rate,holidayRows,quoteKey,savedQuote,quoteLines,money,overtimeText} from './quote.mjs?v=2.0.1126.18';
+import {brandDefaults,readBrand} from './brand.mjs?v=2.0.1126.18';
 
-import {matchesFamily,prepareLegacyBatch,noteSpecs,noteRows,writeNoteRows,noteCycle,noteActive,bindPendingNotes,activeFamily,bookingSegments,bookingLines,serviceName,fresh,blanks,fields,titles,day,filename,mediaLabel,warnings,publicBlocks,tasks,sourceKey,normalize,migrate} from './workspace-model.mjs?v=2.0.1126.17';
-import {makeText as legacyText} from './model.mjs?v=2.0.1126.17';
-import {DriveStore,digest} from './drive.mjs?v=2.0.1126.17';
-import {openDB,storeDB} from './drafts.mjs?v=2.0.1126.17';
-import {buildPDF} from './plan-pdf.mjs?v=2.0.1126.17';
+import {matchesFamily,prepareLegacyBatch,noteSpecs,noteRows,writeNoteRows,noteCycle,noteActive,bindPendingNotes,activeFamily,bookingSegments,bookingLines,serviceName,fresh,blanks,fields,titles,day,filename,mediaLabel,warnings,publicBlocks,tasks,sourceKey,normalize,migrate} from './workspace-model.mjs?v=2.0.1126.18';
+import {makeText as legacyText} from './model.mjs?v=2.0.1126.18';
+import {DriveStore,digest} from './drive.mjs?v=2.0.1126.18';
+import {openDB,storeDB} from './drafts.mjs?v=2.0.1126.18';
+import {buildPDF} from './plan-pdf.mjs?v=2.0.1126.18';
 const $=id=>document.getElementById(id),drive=new DriveStore(),db=storeDB(await openDB().catch(error=>{$('main').innerHTML='<div class="panel"><h1>目前無法啟用草稿保存</h1><p>此瀏覽器未能開啟本機資料庫，請換外部瀏覽器或檢查儲存空間；尚未開放填寫，避免資料遺失。</p></div>';throw error;}));
 let records=await db.all(),entry=null,view='service',kind='cat',petIndex=0,undo=[],syncTimer,localChain=Promise.resolve(),syncBusy=false,photoBusy=false,pdf=null,photoUrl=null,localFailure=false;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -234,7 +234,7 @@ async function importLegacy(file){
 }
 async function backup(){if(!entry)return;try{await localChain;const f=structuredClone(entry.f),originals={};for(const p of f.photos)originals[p.id]=await dataURL(await photoBlob(p));download(new Blob([JSON.stringify({format:'lili-homecare-backup',version:2,family:f,originals,brand})],{type:'application/json'}),(f.name||'家庭')+'_完整內部備份.json');toast('完整備份已交給瀏覽器下載，內含原始照片，請勿傳給家長。');}catch(e){toast('備份未完成：'+e.message);}}
 async function restore(file){try{const b=JSON.parse(await file.text());if(b.format!=='lili-homecare-backup'||![1,2].includes(b.version)||!b.originals)throw Error('不是完整備份');const f=b.version===2?normalize(b.family):migrate(b.family,legacyText(b.family));const staged=[];for(const p of f.photos){const data=b.originals[p.id];if(typeof data!=='string'||!data.startsWith('data:'+p.mime+';base64,'))throw Error('照片原檔缺漏：'+p.name);const bytes=Uint8Array.from(atob(data.split(',')[1]),c=>c.charCodeAt(0));if(bytes.length!==p.size)throw Error('照片原檔大小不符');const newId=crypto.randomUUID();staged.push([newId,new Blob([bytes],{type:p.mime})]);p.id=newId;delete p.driveId;}if(!await confirmAction('還原成獨立家庭副本？','會保留現有資料，不會覆蓋同名家庭。','確認還原'))return;for(const[id,blob]of staged)await db.put('photos',blob,id);f.id=crypto.randomUUID();f.name+='（還原副本）';const r={id:f.id,f,remote:null,rev:1,syncedRev:0};records.push(r);await persist(r);await openRecord(r.id);if(b.brand&&['service','promise','contact'].every(k=>typeof b.brand[k]==='string')&&await confirmAction('也還原共用品牌設定？','這會更新本機及後續同步的全家庭共用設定。','還原品牌設定')){brand=readBrand({service:b.brand.service,promise:b.brand.promise,contact:b.brand.contact,rates:b.brand.rates||brandDefaults.rates});brandState.dirty=true;await db.put('settings',brandState,'brandSync');await db.put('settings',brand,'brand');}schedule();toast('已還原為原瀏覽器草稿，請確認內容後同步 Drive。');}catch(e){toast('還原失敗：'+e.message);}finally{$('restoreFile').value='';}}
-$('quickQuote').onclick=quickInquiry;$('new').onclick=()=>newRecord();$('demo').onclick=()=>newRecord(true);$('search').oninput=list;$('families').onclick=e=>{const b=e.target.closest('[data-id]');if(b){if(photoBusy){toast('請等待照片保存完成');return;}openRecord(b.dataset.id);}};$('cloud').onclick=()=>{$('clientId').value=window.LILI_CONFIG?.googleClientId||localStorage.getItem('liliOAuthClientId')||'';$('setup').showModal();};$('closeSetup').onclick=()=>$('setup').close();$('connectSetup').onclick=()=>connect();$('legacyImport').onclick=()=>$('legacyImportFile').click();$('legacyImportFile').onchange=e=>{if(e.target.files[0])importLegacy(e.target.files[0]);};$('restore').onclick=()=>$('restoreFile').click();$('restoreFile').onchange=e=>{if(e.target.files[0])restore(e.target.files[0]);};$('photoFiles').onchange=e=>addPhotos([...e.target.files]);$('closePhoto').onclick=()=>$('lightbox').close();$('lightbox').onclose=()=>{if(photoUrl)URL.revokeObjectURL(photoUrl);photoUrl=null;$('fullPhoto').removeAttribute('src');};window.addEventListener('online',()=>{if(ready())schedule();else resumeConnection();status();});window.addEventListener('offline',status);window.addEventListener('beforeunload',e=>{if(localFailure||photoBusy||[...pending.values()].some(Boolean)){e.preventDefault();e.returnValue='';}});list();const last=await db.get('settings','lastFamily');if(last&&records.some(r=>r.id===last&&!r.f.archived))await openRecord(last);
+$('quickQuote').onclick=()=>quickInquiry();$('new').onclick=()=>newRecord();$('demo').onclick=()=>newRecord(true);$('search').oninput=list;$('families').onclick=e=>{const b=e.target.closest('[data-id]');if(b){if(photoBusy){toast('請等待照片保存完成');return;}openRecord(b.dataset.id);}};$('cloud').onclick=()=>{$('clientId').value=window.LILI_CONFIG?.googleClientId||localStorage.getItem('liliOAuthClientId')||'';$('setup').showModal();};$('closeSetup').onclick=()=>$('setup').close();$('connectSetup').onclick=()=>connect();$('legacyImport').onclick=()=>$('legacyImportFile').click();$('legacyImportFile').onchange=e=>{if(e.target.files[0])importLegacy(e.target.files[0]);};$('restore').onclick=()=>$('restoreFile').click();$('restoreFile').onchange=e=>{if(e.target.files[0])restore(e.target.files[0]);};$('photoFiles').onchange=e=>addPhotos([...e.target.files]);$('closePhoto').onclick=()=>$('lightbox').close();$('lightbox').onclose=()=>{if(photoUrl)URL.revokeObjectURL(photoUrl);photoUrl=null;$('fullPhoto').removeAttribute('src');};window.addEventListener('online',()=>{if(ready())schedule();else resumeConnection();status();});window.addEventListener('offline',status);window.addEventListener('beforeunload',e=>{if(localFailure||photoBusy||[...pending.values()].some(Boolean)){e.preventDefault();e.returnValue='';}});list();const last=await db.get('settings','lastFamily');if(last&&records.some(r=>r.id===last&&!r.f.archived))await openRecord(last);
 
 $('archive').onclick=()=>{archiveView=!archiveView;$('archive').textContent=archiveView?'返回家庭檔案':'已刪除家庭';entry=null;render();};
 $('brandEdit').onclick=()=>{for(const key of Object.keys(brandDefaults))$(key).value=brand[key];$('brandStatus').textContent=brandState.error|| (brandState.dirty?'已存本機，等待雲端同步':brandState.remote?'已同步至 Drive':'此裝置的設定');$('brandDialog').showModal();};
@@ -301,20 +301,37 @@ function crmDialog(title,body){const d=crmEl('dialog','','crm-modal');d.append(h
 function crmInput(parent,label,value='',type='number',step='1'){const l=labelText(crmEl('label'),label);const i=crmEl('input');i.type=type;if(type==='number')i.step=step;i.value=value;l.append(i);parent.append(l);return i;}
 function crmCheck(parent,label,value){const l=crmEl('label');const i=crmEl('input');i.type='checkbox';i.checked=value;l.append(i,document.createTextNode(label));parent.append(l);return i;}
 
-function quickInquiry(){
+function quickInquiry(f=null){
  const body=crmEl('div','','quick-inquiry'),dlg=crmDialog('快速詢價・LINE 回覆',body);
- body.append(crmEl('p','不用建立家庭、預約或連接 Drive；只試算，不保存客戶資料。','muted'));
+ body.append(crmEl('p',f?(f.name||'未命名家庭')+'｜依現行費率試算，不改動家庭、舊預約或正式報價。':'不用建立家庭、預約或連接 Drive；只試算，不保存客戶資料。','muted'));
  const form=crmEl('div','','crm-fields');body.append(form);
  const count=(label)=>{const block=crmEl('div','','quick-count'),head=crmEl('label',label),row=crmEl('div','','quick-stepper'),i=crmEl('input');i.type='number';i.min='0';i.step='1';i.value='0';i.setAttribute('aria-label',label);
  const change=n=>{i.value=String(Math.max(0,(Number.isSafeInteger(Number(i.value))?Number(i.value):0)+n));draw();};row.append(button('−',()=>change(-1)),i,button('＋',()=>change(1)));block.append(head,row);form.append(block);return i;};
- const cats=count('喵寶數量'),dogs=count('犬寶數量');
+ const cats=count('喵寶數量'),dogs=count('犬寶數量');if(f){cats.value=f.groups.cat?.pets.length||0;dogs.value=f.groups.dog?.pets.length||0;}
  const choose=(parent,label,options,initial)=>{const l=labelText(crmEl('label'),label),s=crmEl('select');s.setAttribute('aria-label',label);for(const [v,t] of options){const o=crmEl('option',t);o.value=v;s.append(o);}s.value=initial;l.append(s);parent.append(l);return s;};
  const med=choose(form,'是否需要餵藥／特殊醫囑',[['unknown','尚未確認'],['no','沒有'],['yes','有，需確認細節']],'unknown');
  const walk=choose(form,'犬寶散步需求',[['unknown','尚未確認'],['no','不需要'],['yes','一般散步'],['long','較長時間散步']],'unknown');
- const km=crmInput(form,'單程機車導航公里（選填）','','number','0.1');km.min='0';km.placeholder='未知可留空';
+ const km=crmInput(form,'單程機車導航公里（選填）',f?(savedQuote(f)?.km??''):'','number','0.1');km.min='0';km.placeholder='未知可留空';
  const trips=crmInput(form,'預估總趟數（選填）','');trips.min='1';trips.placeholder='未知可留空';
  body.append(crmEl('p','車馬費可等地址確認後再算；餵藥不自動加價，需依照護內容評估。','muted'));
  const cards=crmEl('div','','quick-options');body.append(cards);
+ let legacyMinutes=null,legacyService=null,legacyOut=null;
+ if(f){
+  const prev=bookingSegments(f.booking),source=oldBookingText(f);
+  const old=crmEl('details','','quote-advanced');old.append(crmEl('summary','舊規格／自訂時間比較'));body.append(old);
+  const oldText=[...prev.map(s=>s.a+'～'+s.b+'｜'+s.visits.map(v=>v.minutes+' 分鐘 '+v.service).join('、')),source].filter(Boolean).join('\n');
+  if(oldText)old.append(crmEl('p','歷史／既有預約參考（不會直接成為本期預約）：\n'+oldText,'legacy-original'));
+  else old.append(crmEl('p','尚無可辨識的舊預約規格，可自行輸入原服務時間。','muted'));
+  const rows=prev.flatMap(s=>s.visits);
+  const unique=[...new Set(rows.map(v=>v.service+'|'+v.minutes))];
+  const rawM=[...new Set(Array.from(source.matchAll(/(\d{1,3})\s*分鐘/g),m=>m[1]))];
+  const initial=unique.length===1?unique[0].split('|')[1]:!unique.length&&rawM.length===1?rawM[0]:'';
+  legacyMinutes=crmInput(old,'原服務／希望服務分鐘',initial);legacyMinutes.min='1';legacyMinutes.max='720';
+  legacyService=choose(old,'原方案類型',[['','不確定，依時間比較'],['生活照顧','生活照顧'],['陪伴專案','陪伴專案'],['照顧＋散步','照顧＋散步'],[mixedPlan,mixedPlan]],unique.length===1?unique[0].split('|')[0]:'');
+  legacyOut=crmEl('div','','crm-result');old.append(legacyOut);
+  old.append(crmEl('p','比例試算是內部參考，不是正式費率；不得自動縮短最低服務時間，仍需自行判斷及確認承接。','muted'));
+ }
+
  const preview=crmEl('textarea');preview.rows=8;preview.readOnly=true;preview.setAttribute('aria-label','LINE 報價回覆文字');
  const copy=button('複製 LINE 報價回覆',async()=>{if(!preview.value)return;try{await navigator.clipboard.writeText(preview.value);toast('已複製，可直接貼到 LINE。');}catch{preview.focus();preview.select();try{if(document.execCommand('copy')){toast('已複製，可直接貼到 LINE。');return;}}catch{}toast('已選取文字，請使用手機的複製功能。');}},'primary');
  const output=crmEl('div','','quick-output');output.append(heading('可直接貼到 LINE 的回覆'),preview,copy);body.append(output);
@@ -322,22 +339,22 @@ function quickInquiry(){
   walk.parentElement.hidden=!(Number(dogs.value)>0);
   const q=inquiryQuote({c:cats.value===''?NaN:cats.value,d:dogs.value===''?NaN:dogs.value,med:med.value,walk:walk.value,km:km.value,trips:trips.value},currentRates());
   cards.replaceChildren();
-  if(q.error){cards.append(crmEl('p',q.error,'issue'));preview.value='';output.hidden=true;copy.disabled=true;return;}
+  if(q.error){cards.append(crmEl('p',q.error,'issue'));if(legacyOut)legacyOut.textContent=q.error;preview.value='';output.hidden=true;copy.disabled=true;return;}
   for(const o of q.options){
-   const card=crmEl('div','','booking-visit');card.append(crmEl('strong',(o.recommended?'推薦｜':o.reference?'參考｜':'')+o.title),crmEl('strong',o.min+' 分鐘 · '+money(o.fee)+'／趟','quick-price'),crmEl('p',o.detail));
-   if(o.unit!==null)card.append(crmEl('p','含車馬費 '+money(o.unit)+'／趟'+(o.total!==null?'；預估全期 '+money(o.total):''),'muted'));else card.append(crmEl('small','不含車馬費，待確認距離'));
+   const card=crmEl('div','','booking-visit');card.append(crmEl('strong',(o.recommended?'推薦｜':o.reference?'參考｜':'')+o.title),crmEl('strong',o.min+' 分鐘 · '+money(o.unit??o.fee)+'／趟','quick-price'),crmEl('p',o.detail));
+   if(o.unit!==null)card.append(crmEl('small','已含車馬費'),...(o.total!==null?[crmEl('p','預估全期 '+money(o.total),'muted')]:[]));else card.append(crmEl('small','內部基礎費率；尚未計入車馬費，不直接對外報價'));
    cards.append(card);
   }
   if(q.travelKnown)cards.append(crmEl('p','每趟車馬費 '+money(q.travel),'muted'));
   for(const msg of q.warnings)cards.append(crmEl('p',msg,'issue'));
   cards.append(crmEl('p','一般檔期參考；特殊檔期及正式預約仍須另行確認。','muted'));
-  preview.value=q.message;output.hidden=false;copy.disabled=false;
+  if(legacyOut){const a=legacyQuoteReference(Number(cats.value),Number(dogs.value),legacyService.value,legacyMinutes.value,currentRates());if(a){const total=q.travelKnown?a.estimate+q.travel:null;legacyOut.textContent=['時間最接近的現行方案：'+a.nearest.title+'｜'+a.nearest.min+' 分鐘／'+money(a.nearest.fee+(q.travelKnown?q.travel:0))+(q.travelKnown?'（含車馬）':'（照護費參考）'),'依原規格試算：以 '+a.basis.title+' '+a.basis.min+' 分鐘的費率為基準',legacyMinutes.value+' 分鐘 × '+money(a.hourly)+'／小時（時薪顯示四捨五入）','比例試算照護費 '+money(a.estimate)+(total!==null?'；含車馬 '+money(total)+'／趟':''),'非正式報價，須由保姆確認最低服務時間、照護內容與承接意願。'].join('\n');}else legacyOut.textContent=legacyMinutes.value?'此規格需個別評估，無可用的標準比例參考。':'輸入分鐘數，即可比較最接近的現行方案。';}preview.value=q.message;output.hidden=false;copy.disabled=false;
  }
  body.addEventListener('input',draw);body.addEventListener('change',draw);draw();dlg.showModal();
 }
 
 function currentRates(){try{return readRates(brand.rates);}catch{return structuredClone(defaultRates);}}
-function quotePanel(f){const root=crmEl('div','','panel');const q=savedQuote(f);root.append(heading('本次照護報價'),crmEl('p',q?(q.key!==quoteKey(f)?'預約或毛寶數量已變更，請重新確認報價':money(q.total)+'｜已確認報價'):'尚未確認報價'),button('開啟報價試算器',()=>quoteDialog(f),'primary'),button('加時照護費用'+(f.booking.overtime?'｜每15分 '+money(Number(f.booking.overtimeFee)):'｜未啟用'),()=>overtimeDialog(f)),button('歷史報價紀錄',()=>historyDialog(f)));return root;}
+function quotePanel(f){const root=crmEl('div','','panel');const q=savedQuote(f),t=day(),today=t.year+'-'+t.month+'-'+t.day,rs=bookingSegments(f.booking),current=hasCurrentBooking(rs,today);root.append(heading('本次照護報價'),crmEl('p',q?(q.key!==quoteKey(f)?'預約或毛寶數量已變更，請重新確認報價':money(q.total)+'｜已確認報價'):'尚未確認報價'),button('依現行費率快速試算',()=>quickInquiry(f),'primary'),...(current?[button('本期預約正式報價',()=>quoteDialog(f))]:[crmEl('p',rs.length?'目前只有過去預約；可直接快速試算，不覆蓋歷史。':'尚未建立本期預約，仍可快速試算。','muted')]),button('加時照護費用'+(f.booking.overtime?'｜每15分 '+money(Number(f.booking.overtimeFee)):'｜未啟用'),()=>overtimeDialog(f)),button('歷史報價紀錄',()=>historyDialog(f)));return root;}
 
 function quoteDialog(f){
  const b=f.booking,rs=bookingSegments(b),r=currentRates(),old=savedQuote(f),c=f.groups.cat?.pets.length||0,d=f.groups.dog?.pets.length||0,same=old?.key===quoteKey(f);
