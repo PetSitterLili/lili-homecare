@@ -1,5 +1,6 @@
-import {filename,careBlocks,serviceName,bookingLines} from './workspace-model.mjs?v=2.0.1126.10';
-import {brandDefaults,links,palette} from './brand.mjs?v=2.0.1126.10';
+import {quoteLines,overtimeText} from './quote.mjs?v=2.0.1126.11';
+import {filename,careBlocks,serviceName,bookingLines} from './workspace-model.mjs?v=2.0.1126.11';
+import {brandDefaults,links,palette} from './brand.mjs?v=2.0.1126.11';
 const W=794,H=1123,M=38,B=1060,inner=W-2*M;
 const clean=values=>values.filter(x=>typeof x==='string'&&x.trim());
 const sentence=value=>/[。！？.!?]$/.test(value.trim())?value.trim():value.trim()+'。';
@@ -199,7 +200,7 @@ export async function buildPDF(f,brand=brandDefaults){
   ['回家的方式與門鎖安全',clean([f.entry.pickup&&(/^(已取|已取得)$/.test(f.entry.pickup.trim())?'鑰匙已取得。':'取鑰匙：'+f.entry.pickup),f.entry.door,f.entry.return&&(/^(最後一趟放門內|最後一趟放回門內)$/.test(f.entry.return.trim())?'最後一趟將鑰匙放回門內。':'還鑰匙：'+f.entry.return)])],
   ['身體小狀況與特別照顧',care.filter(b=>b.id.endsWith('-health')).flatMap(b=>[b.title,...careText('health',f.groups[b.id.split('-')[0]].health)])]
  ].filter(([,ls])=>ls.length);
- for(const item of basics){if(item[0]==='陪伴毛孩的時間與細節')row([item]);else row([item]);}
+ for(const item of basics){row([item]);if(item[0]==='陪伴毛孩的時間與細節'){const q=quoteLines(f);if(q.length)row([['本次照護費用',q]]);const ot=overtimeText(f.booking);if(ot)row([['加時照護費用',[{note:ot}]]]);}}
  const pets=Object.entries(f.groups).flatMap(([kind,g])=>g.pets.map(p=>[(kind==='cat'?'🐱 ':'🐶 ')+(p.name||'毛寶'),clean([petStory(p)])]));
  if(pets.length){section('毛孩的小個性與相處默契');rows(pets);}
  cover=false;page();
