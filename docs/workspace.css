@@ -44,3 +44,6 @@ aside>button{margin:0 2px 3px 0}
  .nav button,.petnav button,.species button,header button{font-size:12px;padding:5px 8px}
  #main{padding-top:16px}
 }
+
+/* Compact overall workspace display; PDF canvas dimensions remain unchanged. */
+body{zoom:.8}
