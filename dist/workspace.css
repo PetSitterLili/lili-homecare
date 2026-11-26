@@ -99,3 +99,20 @@ body{zoom:.8}
 .booking-calendar .booking-selected{background:#e7ddef!important;border:1px solid #b5a1c6!important;font-weight:700}.booking-calendar .booking-occupied{background:#eeeef0;color:#8c8791;opacity:1;cursor:not-allowed}.booking-selection{font-size:14px;color:#66596f;background:#f1edf6;border-radius:10px;padding:10px;overflow-wrap:anywhere;margin:4px 0}
 
 .profile-panel .row{flex-wrap:wrap}.profile-link{display:inline-block;padding:10px 12px;border:1px solid #dcd6e3;border-radius:10px;background:#f2edf6;color:#66596f;text-decoration:none}#familyPager[hidden]{display:none!important}
+
+
+/* Family workstation: compact, responsive icon and text controls. */
+.profile-panel{padding:14px 16px}
+.profile-panel>h2,.profile-panel>h3{margin:0 0 10px}
+.profile-meta{display:flex;flex-wrap:wrap;gap:5px;margin:0 0 12px;align-items:center}
+.profile-chip{display:inline-block;border-radius:7px;padding:3px 7px;background:#f3f1f5;color:#77707e;font-size:12px;line-height:1.5;font-weight:400;overflow-wrap:anywhere}
+.profile-tenure{font-variant-numeric:tabular-nums}
+.profile-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;max-width:520px}
+.profile-panel .profile-action{display:flex;align-items:center;justify-content:flex-start;gap:7px;box-sizing:border-box;width:100%;min-width:0;min-height:40px;margin:0;padding:7px 10px;border:1px solid #e1d8e9;border-radius:10px;background:#f2edf6;color:#66596f;font-size:14px;font-weight:600;line-height:1.35;text-align:left;text-decoration:none;white-space:normal}
+.profile-panel .profile-secondary{background:#fcfbfd;border-color:#e2dfe6;color:#766b80}
+.profile-panel .profile-action:focus-visible{outline:2px solid #9482a6;outline-offset:2px}
+.profile-panel .profile-action:active{background:#e9e0f0}
+.profile-icon{display:block;flex:none;width:18px;height:18px;color:#887697}
+.profile-panel .profile-action span{min-width:0;overflow-wrap:anywhere}
+.profile-panel .profile-hint{display:block;margin-top:9px;font-size:11px;line-height:1.6;color:#817888;font-weight:400}
+@media(max-width:360px){.profile-panel{padding:12px}.profile-panel .profile-action{font-size:12px;padding:7px;gap:5px}.profile-icon{width:16px;height:16px}}
