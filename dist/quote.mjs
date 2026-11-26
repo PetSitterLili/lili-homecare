@@ -44,19 +44,20 @@ export function inquiryQuote(input,r=defaultRates){
   add('生活照顧',catPlanNames['生活照顧'],base);
   add('陪伴專案',catPlanNames['陪伴專案'],'包含生活照顧方案的完整內容，並增加深度互動與陪伴時間，依毛寶意願安排遊戲、安撫、梳毛及眼鼻分泌物清潔等。簡易點藥或其他個別健康照護依事先約定，相關加購費用另行確認。');
  }
- if(!result.options.length)result.warnings.push(d>=3?'三位犬寶以上的散步方案暫不開放；此家庭需個別評估照護及報價。':'此家庭規模須個別評估承接與報價。');
+ if(!result.options.length)result.warnings.push(d>=3?'目前三位犬寶（含）以上的家庭暫不承接，謝謝您的理解。':'此家庭規模須個別評估承接與報價。');
  if(med==='yes')result.warnings.push('有醫囑／餵藥需求，請提供對象、藥品、份量、頻率及操作方式，確認能否承接及是否需調整時間與報價。');
  if(med==='unknown')result.warnings.push('如有餵藥或特殊健康照護需求，請事先告知。');
  if(kmRaw&&tv===null)result.warnings.push('單程 30.1 公里以上，車程費用另行評估。');
- const lines=['您好～依目前'+[c?c+' 位喵寶':'',d?d+' 位犬寶':''].filter(Boolean).join('＋')+'的家庭配置，先提供以下方案供您參考：'];
  const visible=result.options.filter(o=>!o.reference);
- for(const o of visible){
-  lines.push('',(o.recommended?'推薦｜':'')+o.title,o.min+' 分鐘'+(o.unit!==null?'｜'+money(o.unit)+'／趟':''),o.detail);
+ const kids=[c?c+' 位喵寶小朋友':'',d?d+' 位犬寶小朋友':''].filter(Boolean).join('、');
+ const lines=['爸爸／媽媽您好呀～ 🐾','目前家中有 '+kids+'，'+(visible.length>1?'可以先參考我幫您整理的以下兩個方案唷！':visible.length===1?'先提供我幫您整理的照護方案：':'這個家庭的照護需求需要先進一步確認唷。')];
+ for(const [i,o] of visible.entries()){
+  lines.push('',(visible.length>1?['① ','② '][i]||'':'')+o.title+'｜'+o.min+' 分鐘'+(o.unit!==null?'・'+money(o.unit)+'／趟':''),'照護內容：'+o.detail);
   if(o.total!==null)lines.push('預估 '+trips+' 趟共 '+money(o.total));
  }
- if(visible.length)lines.push('',result.travelKnown?'以上費用皆已含車程費用。':kmRaw?'服務距離需個別確認，確認後提供含車程費用的完整報價。':'請提供服務地址或所在區域，確認距離後提供含車程費用的完整報價。');
+ if(visible.length)lines.push('',result.travelKnown?'以上費用都已經幫您包含車程費用囉！':kmRaw?'這個距離需要再評估一下，確認後會提供含車程費用的完整報價唷。':'再麻煩您提供服務地址或所在區域，我會確認距離後，將車程費用一併納入報價唷！');
  if(result.warnings.length)lines.push('',...result.warnings);
- lines.push('','以上為一般檔期初步詢價，特殊檔期加價、實際服務時間及承接情況，待確認日期與照護需求後另行確認。');
+ lines.push('','以上是常態檔期的初步線上報價。實際照護時間、家中動線與照護流程等細節，我們會在免費家訪時再一起確認，讓照護安排更符合孩子們的需求。','如果詢問的日期落在特殊節慶或假期，也會再幫您確認該檔期的費用唷！🤍');
  result.message=lines.join('\n');return result;
 }
 

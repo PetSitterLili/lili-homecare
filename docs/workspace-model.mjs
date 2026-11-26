@@ -102,7 +102,7 @@ export function sourceKey(f){return JSON.stringify({cardVersion:2,contact:f.cont
 export function normalize(raw){if(raw?.schema!==2||typeof raw.id!=='string'||typeof raw.name!=='string'||!raw.groups||!Array.isArray(raw.photos)||!Array.isArray(raw.runs)||raw.photos.length>1000||raw.runs.length>1000)throw Error('家庭資料格式不正確');const f=fresh();f.id=raw.id;if(raw.archived===true)f.archived=true;f.name=raw.name;const safeObj=o=>{const result={};for(const[k,v]of Object.entries(o||{})){if(['__proto__','constructor','prototype'].includes(k))continue;if(typeof v==='string'||typeof v==='boolean'||v===null||Array.isArray(v)&&v.every(x=>typeof x==='string'))result[k]=v;}return result;};f.clientRisk={status:['normal','watch','blacklist'].includes(raw.clientRisk?.status)?raw.clientRisk.status:'normal',note:typeof raw.clientRisk?.note==='string'?raw.clientRisk.note:''};f.contact=safeObj(raw.contact);f.booking=safeObj(raw.booking);f.booking.services=Array.isArray(f.booking.services)?f.booking.services:[];f.media={status:['yes','no','pending'].includes(raw.media?.status)?raw.media.status:'pending',note:typeof raw.media?.note==='string'?raw.media.note:''};for(const k of ['decisionEditedAt','legacyConsentFixedAt'])if(typeof raw.media?.[k]==='string')f.media[k]=raw.media[k];if(typeof raw.media?.careNoteRows_note==='string')f.media.careNoteRows_note=raw.media.careNoteRows_note;f.entry=safeObj(raw.entry);f.environment=String(raw.environment||'');f.extra=String(raw.extra||'');for(const k of ['careNoteRows_environment','careNoteRows_extra'])if(typeof raw[k]==='string')f[k]=raw[k];f.updatedAt=typeof raw.updatedAt==='string'?raw.updatedAt:null;f.groups={};for(const kind of ['cat','dog'])if(raw.groups[kind]){const g=blanks(),src=raw.groups[kind];for(const type of Object.keys(g)){if(type==='pets'){g.pets=(Array.isArray(src.pets)?src.pets:[]).slice(0,100).map(safeObj);}else if(type==='food'){for(const t of ['dry','wet','snack'])g.food[t]=safeObj(src.food?.[t]);}else g[type]=safeObj(src[type]);}f.groups[kind]=g;}if(!Object.keys(f.groups).length)throw Error('缺少貓狗資料');f.photos=raw.photos.map(p=>{if(typeof p.id!=='string'||typeof p.name!=='string'||typeof p.caption!=='string'||!['image/jpeg','image/png','image/webp'].includes(p.mime)||typeof p.thumb!=='string'||!/^data:image\/(jpeg|png|webp);base64,/.test(p.thumb)||!Number.isFinite(p.size)||p.size<0)throw Error('照片格式不正確');return {id:p.id,name:p.name,caption:p.caption,mime:p.mime,thumb:p.thumb,size:p.size,...(typeof p.driveId==='string'?{driveId:p.driveId}:{})};});f.runs=raw.runs.map(r=>({id:String(r.id||''),label:String(r.label||''),source:String(r.source||''),tasks:(Array.isArray(r.tasks)?r.tasks:[]).map(t=>({id:String(t.id||''),title:String(t.title||''),detail:String(t.detail||'')})),checks:safeObj(r.checks),createdAt:String(r.createdAt||'')}));if(raw.legacy)f.legacy=raw.legacy;if(raw.importReview===true)f.importReview=true;for(const k of ['importSource','importOriginal','importReviewedAt'])if(typeof raw[k]==='string')f[k]=raw[k];return f;}
 export function migrate(old,oldText){const f=fresh();f.id=old.id;f.name=old.name;f.updatedAt=old.updatedAt;f.photos=old.photos||[];f.legacy=old;f.extra='舊版資料完整保留，請確認後逐步整理到新欄位。\n\n'+oldText;return f;}
 
-import {catPlanNames,displayQuoteLabel,mixedPlan,mixedCare,mixedService} from './quote.mjs?v=2.0.1126.23';
+import {catPlanNames,displayQuoteLabel,mixedPlan,mixedCare,mixedService} from './quote.mjs?v=2.0.1126.24';
 // Legacy service keys remain valid in stored families and visit cards.
 export function serviceName(service,groups){
  if(groups.cat&&groups.dog&&mixedService(service))return mixedPlan;
@@ -170,24 +170,3 @@ export function syncOverview(records,state={}){
  return {rows,done,errors,queued,active,errorCount,tone,label,brandError,connectionError,importError};
 }
 
-export function legacyConsentPatch(f){
- if(!f.importReview||f.importReviewedAt||f.media?.decisionEditedAt||f.media?.legacyConsentFixedAt||!f.importOriginal)return null;
- const raw=f.importOriginal.match(/(?:^|\n)【影像授權意願】[ \t]*\n?([\s\S]*?)(?=\n【|$)/)?.[1]?.trim()||'';
- if(!raw)return null;
- const s=raw.normalize('NFKC');let status,note;
- if(/^(?:不可以|不願意|不同意|拒絕)(?:$|[，,。；;（(\s])/.test(s)){status='no';note=raw;}
- else if(/^(?:可以|願意|同意)(?:$|[，,。；;（(\s])/.test(s)){status='yes';note=raw.replace(/^(?:可以|願意|同意)[，,。；;\s]*/,'').trim();if(/^(?:但)?\s*(?:不願意|不同意|不可以|拒絕)(?:對外|公開|分享|拍攝|任何|全部)/.test(note))return null;}
- else return null;
- const media=f.media||{},current=media.status||'pending',old=String(media.note||'').trim();
- if(current!=='pending'&&current!==status)return null;
- if(old&&old!==raw&&old!==note)return null;
- const rows=noteRows({obj:media,key:'note',flag:false,prefix:''});
- if(rows.length>1||rows.some(r=>r.flag||r.temp||r.closed||r.text.trim()!==old))return null;
- if(current===status&&old===note)return null;
- const next={...media,status,note};
- if(typeof media.careNoteRows_note==='string'){
-  if(rows.length)writeNoteRows({obj:next,key:'note'},note?[{...rows[0],text:note}]:[]);
-  else if(note)delete next.careNoteRows_note;
- }
- return {status,note,raw,media:next};
-}

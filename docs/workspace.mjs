@@ -1,12 +1,12 @@
-import {rememberGrant,recallGrant,forgetGrant} from './tab-grant.mjs?v=2.0.1126.23';
-import {displayQuoteLabel,legacyQuoteReference,oldBookingText,hasCurrentBooking,inquiryQuote,mixedPlan,mixedCare,mixedService,defaultRates,readRates,days,travel,rate,holidayRows,quoteKey,savedQuote,quoteLines,money,overtimeText} from './quote.mjs?v=2.0.1126.23';
-import {brandDefaults,readBrand} from './brand.mjs?v=2.0.1126.23';
+import {rememberGrant,recallGrant,forgetGrant} from './tab-grant.mjs?v=2.0.1126.24';
+import {displayQuoteLabel,legacyQuoteReference,oldBookingText,hasCurrentBooking,inquiryQuote,mixedPlan,mixedCare,mixedService,defaultRates,readRates,days,travel,rate,holidayRows,quoteKey,savedQuote,quoteLines,money,overtimeText} from './quote.mjs?v=2.0.1126.24';
+import {brandDefaults,readBrand} from './brand.mjs?v=2.0.1126.24';
 
-import {legacyConsentPatch,syncOverview,matchesFamily,prepareLegacyBatch,noteSpecs,noteRows,writeNoteRows,noteCycle,noteActive,bindPendingNotes,activeFamily,bookingSegments,bookingLines,serviceName,fresh,blanks,fields,titles,day,filename,mediaLabel,warnings,publicBlocks,tasks,sourceKey,normalize,migrate} from './workspace-model.mjs?v=2.0.1126.23';
-import {makeText as legacyText} from './model.mjs?v=2.0.1126.23';
-import {DriveStore,digest} from './drive.mjs?v=2.0.1126.23';
-import {openDB,storeDB} from './drafts.mjs?v=2.0.1126.23';
-import {buildPDF} from './plan-pdf.mjs?v=2.0.1126.23';
+import {syncOverview,matchesFamily,prepareLegacyBatch,noteSpecs,noteRows,writeNoteRows,noteCycle,noteActive,bindPendingNotes,activeFamily,bookingSegments,bookingLines,serviceName,fresh,blanks,fields,titles,day,filename,mediaLabel,warnings,publicBlocks,tasks,sourceKey,normalize,migrate} from './workspace-model.mjs?v=2.0.1126.24';
+import {makeText as legacyText} from './model.mjs?v=2.0.1126.24';
+import {DriveStore,digest} from './drive.mjs?v=2.0.1126.24';
+import {openDB,storeDB} from './drafts.mjs?v=2.0.1126.24';
+import {buildPDF} from './plan-pdf.mjs?v=2.0.1126.24';
 const $=id=>document.getElementById(id),drive=new DriveStore(),db=storeDB(await openDB().catch(error=>{$('main').innerHTML='<div class="panel"><h1>目前無法啟用草稿保存</h1><p>此瀏覽器未能開啟本機資料庫，請換外部瀏覽器或檢查儲存空間；尚未開放填寫，避免資料遺失。</p></div>';throw error;}));
 let records=await db.all(),entry=null,view='service',kind='cat',petIndex=0,undo=[],syncTimer,localChain=Promise.resolve(),syncBusy=false,photoBusy=false,pdf=null,photoUrl=null,localFailure=false;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -16,7 +16,7 @@ let brand=readBrand(await db.get('settings','brand'));
 let draining=false,connecting=false; const blocked=new Set();let activeSyncId=null,brandSyncActive=false,connectionError='',importError='',importingLegacy=false,syncDetail=null;
 function ready(){return navigator.onLine&&drive.token&&Date.now()<drive.expires&&!connecting;}
 function schedule(){clearTimeout(syncTimer);if(ready())syncTimer=setTimeout(drain,1500);status();}
-async function drain(){if(draining||!ready())return;draining=true;status();try{for(const r of records){if(!ready())break;if(r.rev!==r.syncedRev&&(r.f.name.trim()||r.f.archived)&&!blocked.has(r.id))await sync(r);}if(ready()&&brandState.dirty)await syncBrand();}finally{draining=false;status();}}
+async function drain(){if(draining||!ready())return;draining=true;status();try{for(const r of records){if(!ready())break;if(r.rev!==r.syncedRev&&(r.f.name.trim()||r.f.archived)&&!blocked.has(r.id))await sync(r);}if(ready()&&brandState.dirty)await syncBrand();}finally{draining=false;status();if(ready()&&records.some(r=>r.rev!==r.syncedRev&&(r.f.name.trim()||r.f.archived)&&!blocked.has(r.id))) {clearTimeout(syncTimer);syncTimer=setTimeout(drain,15000);}}}
 let toastTimer;function toast(t){$('toast').textContent=t;$('toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,6500);}
 function confirmAction(title,text,yes='確認'){return new Promise(resolve=>{$('confirmTitle').textContent=title;$('confirmText').textContent=text;$('yesConfirm').textContent=yes;const d=$('confirm');const finish=result=>{d.close();d.oncancel=null;$('yesConfirm').onclick=null;$('cancelConfirm').onclick=null;resolve(result);};$('yesConfirm').onclick=()=>finish(true);$('cancelConfirm').onclick=()=>finish(false);d.oncancel=e=>{e.preventDefault();finish(false);};d.showModal();});}
 function snapshot(){undo.push(JSON.stringify(entry.f));if(undo.length>40)undo.shift();}
@@ -74,9 +74,11 @@ function openSyncDetail(){
 }
 
 const riskLabel={normal:'一般家庭',watch:'重點注意',blacklist:'黑名單・不接案'};
-function list(){const term=$('search').value;$('families').innerHTML=records.filter(r=>!!r.f.archived===archiveView).filter(r=>matchesFamily(r.f,term)).map(r=>'<button data-id="'+esc(r.id)+'" class="'+(r.id===entry?.id?'active':'')+'" data-risk="'+esc(r.f.clientRisk?.status||'normal')+'">'+esc(r.f.name||'未命名家庭')+'<small>'+(r.syncedRev===r.rev&&r.remote?'Drive 已同步':'原瀏覽器草稿')+'</small>'+(r.f.clientRisk?.status&&r.f.clientRisk.status!=='normal'?'<small class="risk-tag">'+esc(riskLabel[r.f.clientRisk.status])+'</small>':'')+(r.f.importReview?'<small class="import-review-tag">◷ 舊資料待複核</small>':'')+'</button>').join('');}
+let familyPage=0;
+const familyPageSize=8;
+function list(){const term=$('search').value,matched=records.filter(r=>!!r.f.archived===archiveView).filter(r=>matchesFamily(r.f,term)),pageCount=Math.max(1,Math.ceil(matched.length/familyPageSize));familyPage=Math.max(0,Math.min(familyPage,pageCount-1));$('familyPager').hidden=matched.length<=familyPageSize;$('familyPrev').disabled=familyPage===0;$('familyNext').disabled=familyPage===pageCount-1;$('familyPageInfo').textContent=(familyPage+1)+'／'+pageCount+' 頁・共 '+matched.length+' 戶';$('families').innerHTML=matched.slice(familyPage*familyPageSize,(familyPage+1)*familyPageSize).map(r=>'<button data-id="'+esc(r.id)+'" class="'+(r.id===entry?.id?'active':'')+'" data-risk="'+esc(r.f.clientRisk?.status||'normal')+'">'+esc(r.f.name||'未命名家庭')+'<small>'+(r.syncedRev===r.rev&&r.remote?'Drive 已同步':'原瀏覽器草稿')+'</small>'+(r.f.clientRisk?.status&&r.f.clientRisk.status!=='normal'?'<small class="risk-tag">'+esc(riskLabel[r.f.clientRisk.status])+'</small>':'')+(r.f.importReview?'<small class="import-review-tag">◷ 舊資料待複核</small>':'')+'</button>').join('');}
 async function openRecord(id){await localChain;const next=records.find(r=>r.id===id);if(!next)return;entry=next;undo=[];kind=Object.keys(entry.f.groups)[0];petIndex=0;view='service';pdf=null;await db.put('settings',id,'lastFamily');render();if(window.matchMedia('(max-width:620px)').matches)window.scrollTo(0,0);}
-async function newRecord(demo=false){archiveView=false;$('archive').textContent='已刪除家庭';if(photoBusy){toast('請等待照片保存完成');return;}const f=fresh();if(demo){f.name='姆姆家四貓（操作範例）';f.groups.cat.pets=[{name:'姆姆',identity:'白底虎斑',personality:'慢熟，依他的步調靠近'}];f.groups.cat.food.dry={item:'範例飼料',amount:'三分之一',unit:'杯',location:'廚房右側下櫃',leftover:'移出洗碗後放回'};}const r={id:f.id,f,remote:null,rev:1,syncedRev:0};records.push(r);await persist(r);await openRecord(r.id);view='edit';render();}
+async function newRecord(demo=false){archiveView=false;familyPage=0;$('archive').textContent='已刪除家庭';if(photoBusy){toast('請等待照片保存完成');return;}const f=fresh();if(demo){f.name='姆姆家四貓（操作範例）';f.groups.cat.pets=[{name:'姆姆',identity:'白底虎斑',personality:'慢熟，依他的步調靠近'}];f.groups.cat.food.dry={item:'範例飼料',amount:'三分之一',unit:'杯',location:'廚房右側下櫃',leftover:'移出洗碗後放回'};}const r={id:f.id,f,remote:null,rev:1,syncedRev:0};records.push(r);await persist(r);await openRecord(r.id);view='edit';render();}
 function button(text,fn,cl=''){const b=document.createElement('button');b.type='button';b.textContent=text;b.className=cl;b.onclick=fn;return b;}
 function heading(text){return labelText(document.createElement('h3'),text);}
 function field(obj,key,label,{long=false,options=null,compact=false,placeholder=''}={}){const spec=!options&&entry&&noteSpecs(entry.f).find(s=>s.obj===obj&&s.key===key);if(spec)return careNoteField(spec,label,placeholder);const wrap=document.createElement('div');wrap.className='field'+(compact?' compact':'');const head=document.createElement('div');head.className='fieldhead';const l=document.createElement('span');labelText(l,label);head.append(l,button('清除',async()=>{if(!obj[key])return;if(await confirmAction('清除此欄？','只清除「'+label+'」，其他資料不變。','確認清除')){snapshot();obj[key]='';dirty();input.value='';}},'clear'));let input=document.createElement(options?'select':long?'textarea':'input');input.setAttribute('aria-label',label);input.placeholder=placeholder;
@@ -173,24 +175,6 @@ function riskDialog(f){
  for(const [value,label] of Object.entries(riskLabel)){const o=crmEl('option',label);o.value=value;select.append(o);}select.value=original.status;note.value=original.note;note.placeholder='接案風險、溝通界線、需先確認的條件';note.setAttribute('aria-label','內部接案警示備註');
  body.append(crmEl('p','僅供內部查看；不自動刪除家庭或更改既有預約。','muted'),labelText(crmEl('label'),'接案狀態'),select,labelText(crmEl('label'),'內部備註'),note,button('保存接案警示',()=>{if(entry?.f!==f)return toast('家庭已切換，請重新開啟。');snapshot();f.clientRisk={status:select.value,note:note.value};dirty();dlg.close();render();},'primary'));dlg.showModal();
 }
-async function fixLegacyConsent(){
- if(!ready()||draining||syncBusy||brandSyncActive||photoBusy||importingLegacy)return toast('請等同步完成並保持 Drive 連線，再校正舊客授權。');
- await localChain;
- const candidates=records.filter(r=>!r.f.archived).flatMap(r=>{const p=legacyConsentPatch(r.f);return p?[{r,p,rev:r.rev}]:[];});
- if(!candidates.length)return toast('沒有可安全自動校正的舊客授權；已確認或不明確者均保留。');
- const body=crmEl('div'),dlg=crmDialog('舊客影像授權校正',body);
- body.append(crmEl('p','預覽 '+candidates.length+' 戶，只修改授權狀態及原始授權前綴，不改其他照護內容或解除待複核。已人工確認、原文矛盾及自訂備註保留。','muted'));
- const list=crmEl('div','','sync-list'),checks=[];
- for(const x of candidates){const box=crmEl('div','','sync-item'),c=crmCheck(box,x.r.f.name,true);checks.push([x,c]);box.append(crmEl('p','原文：'+x.p.raw),crmEl('p','校正後：'+(x.p.status==='yes'?'願意分享':'不願意分享')+(x.p.note?'｜'+x.p.note:'（無附帶條件）')));list.append(box);}
- body.append(list,crmEl('p','歷史授權只反映當時意願；附帶條件必須遵守，正式公開前仍須確認是否適用。','issue'));
- const apply=button('確認校正勾選家庭',async()=>{
-  if(!ready()||draining||syncBusy||brandSyncActive||photoBusy||importingLegacy)return toast('目前同步中，請完成後再校正。');
-  apply.disabled=true;let count=0,skip=0;
-  for(const [x,c] of checks){if(!c.checked)continue;const p=legacyConsentPatch(x.r.f);if(!p||x.r.rev!==x.rev){skip++;continue;}if(entry===x.r)snapshot();x.r.f.media={...p.media,legacyConsentFixedAt:new Date().toISOString()};x.r.rev++;x.r.f.updatedAt=new Date().toISOString();await persist(x.r);if(failures.has(x.r.id))skip++;else count++;}
-  dlg.close();pdf=null;render();schedule();toast('已校正 '+count+' 戶，略過或本機保存異常 '+skip+' 戶。請確認全域同步。');
- },'primary');body.append(apply);dlg.showModal();
-}
-
 function renderEdit(content){const f=entry.f;const risk=section('接案警示（僅供保姆內部）',false);risk.body.append(crmEl('p',riskLabel[f.clientRisk?.status||'normal']+'｜不會出現在家長版計畫書或 LINE 回覆。','muted'),button('設定黑名單／重點注意',()=>riskDialog(f)));content.append(risk.e);if(f.importOriginal&&!f.importReview){const revisit=crmEl('div','','row');revisit.append(button('重新標為舊資料待複核',async()=>{if(!await confirmAction('重新標為待複核？','資料與歷史報價都會保留。','確認'))return;snapshot();f.importReview=true;delete f.importReviewedAt;dirty();render();}));content.append(revisit);}if(f.importOriginal){const archive=section('舊版家訪原始紀錄（內部）',false);const pre=document.createElement('pre');pre.className='legacy-original';pre.textContent=f.importOriginal;archive.body.append(pre);content.append(archive.e);}
 if(!f.groups[kind]){kind=Object.keys(f.groups)[0];petIndex=0;}
 let s=section('本次預約與家長資料');let g=grid();for(const[k,l]of[['name','家庭代表名（也用於檔名）']])g.append(field(f,k,l));s.body.append(g);if(f.booking.dates||f.booking.times){const old=section('舊版預約紀錄',false);old.body.append(field(f.booking,'dates','舊版預約日期'),field(f.booking,'times','舊版時段'));s.body.append(old.e);}s.body.append(bookingEditor(f.booking,f.groups),quotePanel(f));g=grid();for(const[k,l]of[['name','家長姓名／稱呼'],['phone','電話'],['emergency','緊急聯絡人與電話'],['address','服務地址'],['guide','位置指引（選填）']])g.append(field(f.contact,k,l));s.body.append(g);content.append(s.e);
@@ -299,7 +283,7 @@ async function returnDirectory({archive=archiveView}={}){
  if(photoBusy){toast('照片正在保存，請稍候。');return;}
  await localChain;
  if(entry&&failures.has(entry.id)){toast('目前家庭本機儲存失敗，請先下載備份。');return;}
- archiveView=archive;$('archive').textContent=archiveView?'返回家庭檔案':'已刪除家庭';
+ if(archiveView!==archive)familyPage=0;archiveView=archive;$('archive').textContent=archiveView?'返回家庭檔案':'已刪除家庭';
  entry=null;undo=[];pdf=null;view='service';
  try{await db.put('settings','','lastFamily');}catch(e){toast('未能保存上次瀏覽位置：'+e.message);}
  render();window.scrollTo(0,0);
@@ -314,7 +298,7 @@ function wireMenu(){
  $('menuQuote').onclick=()=>quickInquiry();
 }
 
-wireMenu();$('fixConsent').onclick=fixLegacyConsent;$('syncIndicator').onclick=openSyncDetail;$('quickQuote').onclick=()=>quickInquiry();$('new').onclick=()=>newRecord();$('demo').onclick=()=>newRecord(true);$('search').oninput=list;$('families').onclick=e=>{const b=e.target.closest('[data-id]');if(b){if(photoBusy){toast('請等待照片保存完成');return;}openRecord(b.dataset.id);}};$('cloud').onclick=()=>{$('clientId').value=window.LILI_CONFIG?.googleClientId||localStorage.getItem('liliOAuthClientId')||'';$('setup').showModal();};$('closeSetup').onclick=()=>$('setup').close();$('connectSetup').onclick=()=>connect();$('legacyImport').onclick=()=>$('legacyImportFile').click();$('legacyImportFile').onchange=e=>{if(e.target.files[0])importLegacy(e.target.files[0]);};$('restore').onclick=()=>$('restoreFile').click();$('restoreFile').onchange=e=>{if(e.target.files[0])restore(e.target.files[0]);};$('photoFiles').onchange=e=>addPhotos([...e.target.files]);$('closePhoto').onclick=()=>$('lightbox').close();$('lightbox').onclose=()=>{if(photoUrl)URL.revokeObjectURL(photoUrl);photoUrl=null;$('fullPhoto').removeAttribute('src');};window.addEventListener('online',()=>{if(ready())schedule();else resumeConnection();status();});window.addEventListener('offline',status);window.addEventListener('beforeunload',e=>{if(localFailure||photoBusy||[...pending.values()].some(Boolean)){e.preventDefault();e.returnValue='';}});list();const last=await db.get('settings','lastFamily');if(last&&records.some(r=>r.id===last&&!r.f.archived))await openRecord(last);
+wireMenu();$('familyPrev').onclick=()=>{familyPage--;list();};$('familyNext').onclick=()=>{familyPage++;list();};$('syncIndicator').onclick=openSyncDetail;$('quickQuote').onclick=()=>quickInquiry();$('new').onclick=()=>newRecord();$('demo').onclick=()=>newRecord(true);$('search').oninput=()=>{familyPage=0;list();};$('families').onclick=e=>{const b=e.target.closest('[data-id]');if(b){if(photoBusy){toast('請等待照片保存完成');return;}openRecord(b.dataset.id);}};$('cloud').onclick=()=>{$('clientId').value=window.LILI_CONFIG?.googleClientId||localStorage.getItem('liliOAuthClientId')||'';$('setup').showModal();};$('closeSetup').onclick=()=>$('setup').close();$('connectSetup').onclick=()=>connect();$('legacyImport').onclick=()=>$('legacyImportFile').click();$('legacyImportFile').onchange=e=>{if(e.target.files[0])importLegacy(e.target.files[0]);};$('restore').onclick=()=>$('restoreFile').click();$('restoreFile').onchange=e=>{if(e.target.files[0])restore(e.target.files[0]);};$('photoFiles').onchange=e=>addPhotos([...e.target.files]);$('closePhoto').onclick=()=>$('lightbox').close();$('lightbox').onclose=()=>{if(photoUrl)URL.revokeObjectURL(photoUrl);photoUrl=null;$('fullPhoto').removeAttribute('src');};window.addEventListener('online',()=>{if(ready())schedule();else resumeConnection();status();});window.addEventListener('offline',status);window.addEventListener('beforeunload',e=>{if(localFailure||photoBusy||[...pending.values()].some(Boolean)){e.preventDefault();e.returnValue='';}});list();const last=await db.get('settings','lastFamily');if(last&&records.some(r=>r.id===last&&!r.f.archived))await openRecord(last);
 
 $('archive').onclick=()=>returnDirectory({archive:!archiveView});
 $('brandEdit').onclick=()=>{for(const key of Object.keys(brandDefaults))$(key).value=brand[key];$('brandStatus').textContent=brandState.error|| (brandState.dirty?'已存本機，等待雲端同步':brandState.remote?'已同步至 Drive':'此裝置的設定');$('brandDialog').showModal();};
@@ -354,7 +338,7 @@ if('serviceWorker' in navigator){
  navigator.serviceWorker.addEventListener('controllerchange',()=>{
   if(ready())sessionMessage('remember',{token:drive.token,expires:drive.expires});
  });
- navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).then(reg=>{reg.update().catch(()=>{});document.addEventListener('visibilitychange',()=>{if(!document.hidden)reg.update().catch(()=>{});});return resumeConnection();}).catch(()=>{});
+ navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).then(reg=>{reg.update().catch(()=>{});document.addEventListener('visibilitychange',()=>{if(!document.hidden){reg.update().catch(()=>{});if(ready())schedule();else resumeConnection();}else if(ready()&&!draining){clearTimeout(syncTimer);void drain();}});return resumeConnection();}).catch(()=>{});
 }
 setInterval(status,15000);status();
 
