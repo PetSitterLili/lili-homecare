@@ -5,21 +5,28 @@ import {readFile} from 'node:fs/promises';
 import {DriveStore} from '../docs/drive.mjs';
 
 test('offline shell can restore the app and every versioned import; private URLs bypass cache',async()=>{
- const events={},cache=new Map();
+ const events={},cache=new Map();let mode='stale';
  const scope='https://example.test/lili-homecare/';
  const storage={
   async addAll(urls){
-   for(const url of urls){const path=new URL(url).pathname.slice('/lili-homecare/'.length);
+   for(const req of urls){const url=req.url;const path=new URL(url).pathname.slice('/lili-homecare/'.length);
     const file=await readFile(new URL('../docs/'+path,import.meta.url));
     cache.set(url,file);}
   },
+  async put(url,response){cache.set(url,await response.text());},
   async match(req){return cache.get(typeof req==='string'?req:req.url);}
  };
  const self={registration:{scope},addEventListener:(type,callback)=>{events[type]=callback;},skipWaiting:async()=>{}};
  vm.runInNewContext(await readFile(new URL('../docs/sw.js',import.meta.url),'utf8'),{
-  URL,self,caches:{open:async()=>storage},fetch:async()=>{throw new Error('test network offline');}
+  URL,Request,self,caches:{open:async()=>storage},fetch:async()=>{
+   if(mode==='offline')throw Error('test network offline');
+   return new Response(mode==='stale'?'old app':await readFile(new URL('../docs/index.html',import.meta.url)));
+  }
  });
- let installed;events.install({waitUntil:p=>{installed=p;}});await installed;
+ let installed;
+ const install=()=>{events.install({waitUntil:p=>{installed=p;}});return installed;};
+ await assert.rejects(install(),/新版首頁尚未就緒/);assert.equal(cache.size,0);
+ mode='current';await install();mode='offline';
  function respond(url,mode){let response;events.fetch({request:{url,method:'GET',mode},respondWith:p=>{response=p;}});return response;}
  const html=(await respond(scope+'?home','navigate')).toString();
  const script=html.match(/type="module" src="([^"]+)"/)[1];

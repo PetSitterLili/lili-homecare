@@ -1,12 +1,23 @@
 // Keep only the public application shell offline. Family data lives in IndexedDB.
-const cacheName = 'lili-homecare-shell-2.0.1126.1';
+const cacheName = 'lili-homecare-shell-2.0.1126.2';
 const scope = self.registration.scope;
-const build = '?v=2.0.1126.1';
-const paths = ['assets/lili-serif.woff2','index.html','manifest.webmanifest','config.js',
+const build = '?v=2.0.1126.2';
+const paths = ['assets/lili-serif.woff2','manifest.webmanifest','config.js',
   ...['workspace.css','workspace.mjs','workspace-model.mjs','model.mjs','brand.mjs','tab-grant.mjs','drive.mjs','drafts.mjs','plan-pdf.mjs'].map(p => p+build),
   ...['cat','ig','line','icon-192','icon-512'].map(name => 'assets/'+name+'.png')];
 const urls = new Set(paths.map(path => new URL(path,scope).href));
-self.addEventListener('install', event => event.waitUntil(caches.open(cacheName).then(cache => cache.addAll([...urls])).then(()=>self.skipWaiting())));
+async function installShell(){
+  const cache=await caches.open(cacheName);
+  const index=new URL('index.html',scope).href;
+  const response=await fetch(index+build,{cache:'reload'});
+  if(!response.ok || !(await response.clone().text()).includes('workspace.mjs'+build)){
+    throw Error('新版首頁尚未就緒');
+  }
+  await cache.addAll([...urls].map(url=>new Request(url,{cache:'reload'})));
+  await cache.put(index,response);
+  await self.skipWaiting();
+}
+self.addEventListener('install',event=>event.waitUntil(installShell()));
 self.addEventListener('activate', event => event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith('lili-homecare-shell-')&&key!==cacheName).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch', event => {
   const req=event.request;
