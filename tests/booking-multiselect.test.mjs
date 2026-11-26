@@ -1,0 +1,28 @@
+import assert from 'node:assert/strict';
+import {fresh,bookingSegments,bookingLines,bookingDateGroups,replaceBookingDates,selectedBookingSegments,expandBookingDates} from '../docs/workspace-model.mjs';
+import {days,rate,defaultRates,holidayRows} from '../docs/quote.mjs';
+
+const v=(service,minutes)=>[{service,minutes,start:'09:00',end:'10:00',note:''}];
+const companion=v('陪伴專案','60'),life=v('生活照顧','30');
+const dates=['2026-12-24','2026-12-27'];
+const rest=['2026-12-23','2026-12-25','2026-12-26','2026-12-28'];
+let rs=replaceBookingDates([],[],dates,companion);
+assert(rs.length===2,'nonconsecutive preserved');
+rs=replaceBookingDates(rs,[],rest,life);
+assert(rs.length===5,'contiguous collapsed only');
+const gs=bookingDateGroups(rs);
+assert(gs.length===2&&gs[0].dates.length===4&&gs[1].dates.length===2,'two groups');
+assert(gs[1].dates.join(',')===dates.join(','),'exact days');
+assert(rs.reduce((n,r)=>n+days(r.a,r.b)*r.visits.length,0)===6,'six visits');
+const f=fresh();f.groups.cat.pets=[{name:'test'}];f.booking.segments=rs.map(r=>JSON.stringify(r));
+assert(bookingSegments(f.booking).length===5,'compatible persisted schema');
+assert(bookingLines(f.booking,f.groups).at(-1)==='本次共計 6 趟到府照護。','PDF count');
+assert(rs.reduce((n,r)=>n+days(r.a,r.b)*rate(1,0,r.visits[0].service,defaultRates).fee,0)===2900,'price exact');
+const modified=replaceBookingDates(rs,gs[1].indices,['2026-12-24'],companion);
+assert(modified.reduce((n,r)=>n+days(r.a,r.b),0)===5,'remove single selected date');
+assert(bookingDateGroups(modified)[0].dates.join(',')===rest.join(','),'other group unchanged');
+let bad=false;try{replaceBookingDates(rs,[],['2026-12-25'],companion);}catch{bad=true;}assert(bad,'overlap blocked');
+assert(selectedBookingSegments(['2026-12-31','2027-01-01'],life).length===1,'cross year');
+assert(selectedBookingSegments(['2026-12-24','2026-12-24'],companion).length===1,'dedup');
+assert(expandBookingDates('2026-12-23','2026-12-28').length===6,'old range');
+assert(holidayRows(selectedBookingSegments(['2027-02-03','2027-02-05'],life),defaultRates).reduce((n,h)=>n+h.total,0)===500,'holiday gaps correct');
