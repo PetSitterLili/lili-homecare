@@ -1,0 +1,24 @@
+import assert from 'node:assert/strict';
+import {syncOverview} from '../docs/workspace-model.mjs';
+
+const row=(id,rev=1,syncedRev=1,remote={id},name=id)=>({id,rev,syncedRev,remote,f:{name}});
+const base={online:true,connected:true};
+const go=(rs,s={})=>syncOverview(rs,{...base,...s});
+assert(go([row('a')]).tone==='green','done');
+assert(go([row('a',2)]).tone==='amber','dirty');
+assert(go([row('a',2)],{activeId:'a'}).active===1,'active');
+assert(go([row('a',2)],{activeId:'a'}).done===0,'active not done');
+assert(go([{...row('a',2),syncError:'衝突'}]).tone==='red','error');
+assert(go([row('a')],{failures:new Map([['a','disk']])}).errorCount===1,'local failure');
+assert(go([row('a')],{pending:new Map([['a',1]])}).queued===1,'local pending');
+assert(go([row('a',1,0,null,'')]).rows[0].kind==='unnamed','unnamed');
+assert(go([row('a')],{online:false}).tone==='gray','offline');
+assert(go([row('a')],{connected:false,expired:true}).label==='授權到期','expired');
+assert(go([row('a')],{brandDirty:true}).tone==='amber','brand pending');
+assert(go([row('a')],{brandError:'conflict'}).tone==='red','brand error');
+assert(go([],{connecting:true,connected:false}).label==='載入雲端','connecting');
+assert(go([],{importing:true}).label==='匯入中','import');
+assert(go([],{importError:'disk'}).tone==='red','import error');
+assert(go([row('a'),row('b',2),row('c',2)],{activeId:'b'}).label==='同步中 1/3','progress');
+assert(go([row('a',1,1,null)]).done===0,'missing remote');
+assert(go([],{connectionError:'network'}).tone==='red','connection error');

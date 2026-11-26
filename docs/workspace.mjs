@@ -1,22 +1,22 @@
-import {rememberGrant,recallGrant,forgetGrant} from './tab-grant.mjs?v=2.0.1126.19';
-import {legacyQuoteReference,oldBookingText,hasCurrentBooking,inquiryQuote,mixedPlan,mixedCare,mixedService,defaultRates,readRates,days,travel,rate,holidayRows,quoteKey,savedQuote,quoteLines,money,overtimeText} from './quote.mjs?v=2.0.1126.19';
-import {brandDefaults,readBrand} from './brand.mjs?v=2.0.1126.19';
+import {rememberGrant,recallGrant,forgetGrant} from './tab-grant.mjs?v=2.0.1126.20';
+import {legacyQuoteReference,oldBookingText,hasCurrentBooking,inquiryQuote,mixedPlan,mixedCare,mixedService,defaultRates,readRates,days,travel,rate,holidayRows,quoteKey,savedQuote,quoteLines,money,overtimeText} from './quote.mjs?v=2.0.1126.20';
+import {brandDefaults,readBrand} from './brand.mjs?v=2.0.1126.20';
 
-import {matchesFamily,prepareLegacyBatch,noteSpecs,noteRows,writeNoteRows,noteCycle,noteActive,bindPendingNotes,activeFamily,bookingSegments,bookingLines,serviceName,fresh,blanks,fields,titles,day,filename,mediaLabel,warnings,publicBlocks,tasks,sourceKey,normalize,migrate} from './workspace-model.mjs?v=2.0.1126.19';
-import {makeText as legacyText} from './model.mjs?v=2.0.1126.19';
-import {DriveStore,digest} from './drive.mjs?v=2.0.1126.19';
-import {openDB,storeDB} from './drafts.mjs?v=2.0.1126.19';
-import {buildPDF} from './plan-pdf.mjs?v=2.0.1126.19';
+import {syncOverview,matchesFamily,prepareLegacyBatch,noteSpecs,noteRows,writeNoteRows,noteCycle,noteActive,bindPendingNotes,activeFamily,bookingSegments,bookingLines,serviceName,fresh,blanks,fields,titles,day,filename,mediaLabel,warnings,publicBlocks,tasks,sourceKey,normalize,migrate} from './workspace-model.mjs?v=2.0.1126.20';
+import {makeText as legacyText} from './model.mjs?v=2.0.1126.20';
+import {DriveStore,digest} from './drive.mjs?v=2.0.1126.20';
+import {openDB,storeDB} from './drafts.mjs?v=2.0.1126.20';
+import {buildPDF} from './plan-pdf.mjs?v=2.0.1126.20';
 const $=id=>document.getElementById(id),drive=new DriveStore(),db=storeDB(await openDB().catch(error=>{$('main').innerHTML='<div class="panel"><h1>目前無法啟用草稿保存</h1><p>此瀏覽器未能開啟本機資料庫，請換外部瀏覽器或檢查儲存空間；尚未開放填寫，避免資料遺失。</p></div>';throw error;}));
 let records=await db.all(),entry=null,view='service',kind='cat',petIndex=0,undo=[],syncTimer,localChain=Promise.resolve(),syncBusy=false,photoBusy=false,pdf=null,photoUrl=null,localFailure=false;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let brandState=await db.get('settings','brandSync')||{};
 let archiveView=false; const failures=new Map(); const pending=new Map();
 let brand=readBrand(await db.get('settings','brand'));
-let draining=false,connecting=false; const blocked=new Set();
+let draining=false,connecting=false; const blocked=new Set();let activeSyncId=null,brandSyncActive=false,connectionError='',importError='',importingLegacy=false,syncDetail=null;
 function ready(){return navigator.onLine&&drive.token&&Date.now()<drive.expires&&!connecting;}
-function schedule(){clearTimeout(syncTimer);if(ready())syncTimer=setTimeout(drain,1500);}
-async function drain(){if(draining||!ready())return;draining=true;try{for(const r of records){if(!ready())break;if(r.rev!==r.syncedRev&&(r.f.name.trim()||r.f.archived)&&!blocked.has(r.id))await sync(r);}if(ready()&&brandState.dirty)await syncBrand();}finally{draining=false;status();}}
+function schedule(){clearTimeout(syncTimer);if(ready())syncTimer=setTimeout(drain,1500);status();}
+async function drain(){if(draining||!ready())return;draining=true;status();try{for(const r of records){if(!ready())break;if(r.rev!==r.syncedRev&&(r.f.name.trim()||r.f.archived)&&!blocked.has(r.id))await sync(r);}if(ready()&&brandState.dirty)await syncBrand();}finally{draining=false;status();}}
 let toastTimer;function toast(t){$('toast').textContent=t;$('toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,6500);}
 function confirmAction(title,text,yes='確認'){return new Promise(resolve=>{$('confirmTitle').textContent=title;$('confirmText').textContent=text;$('yesConfirm').textContent=yes;const d=$('confirm');const finish=result=>{d.close();d.oncancel=null;$('yesConfirm').onclick=null;$('cancelConfirm').onclick=null;resolve(result);};$('yesConfirm').onclick=()=>finish(true);$('cancelConfirm').onclick=()=>finish(false);d.oncancel=e=>{e.preventDefault();finish(false);};d.showModal();});}
 function snapshot(){undo.push(JSON.stringify(entry.f));if(undo.length>40)undo.shift();}
@@ -35,9 +35,44 @@ function status(){
  $('cloud').textContent=connected?'Drive 已連線':expired?'重新連接 Drive':'連接 Google Drive';
  $('cloud').disabled=connected||connecting;
  $('connection').textContent=!navigator.onLine?'離線':connected?'已連接保姆 Google Drive':expired?'Google 授權已到期':'Google Drive 尚未連線';
+ paintSyncOverview(connected,expired);
  const el=$('saveState');if(!el||!entry)return;
  el.textContent=failures.has(entry.id)?'本機儲存失敗，請先下載備份':pending.get(entry.id)?'正在儲存本機草稿':blocked.has(entry.id)?'已存本機 · '+(entry.syncError||'雲端待處理'):!navigator.onLine?'離線 · 已存本機':syncBusy&&entry.syncedRev!==entry.rev?'已存本機 · 正在同步':entry.syncedRev===entry.rev&&entry.remote?'已同步至 Google Drive · '+(entry.syncedAt?new Date(entry.syncedAt).toLocaleString():'完成'):connected?'已存本機 · 等待雲端同步':'已存本機 · 請連接 Drive 同步';
 }
+
+function overview(connected=!!drive.token&&Date.now()<drive.expires,expired=!!drive.expires&&!connected){
+ return syncOverview(records,{failures,pending,activeId:activeSyncId,online:navigator.onLine,connected,expired,draining,connecting,brandActive:brandSyncActive,brandDirty:brandState.dirty,brandError:brandState.error,connectionError,importError,importing:importingLegacy,photoBusy});
+}
+function paintSyncOverview(connected,expired){
+ const v=overview(connected,expired),el=$('syncIndicator');if(!el)return;
+ el.dataset.tone=v.tone;el.querySelector('.sync-label').textContent=v.label;el.title='查看本裝置同步狀態與明細';el.setAttribute('aria-label',v.label+'，查看同步明細');
+ if(syncDetail?.dlg.open)renderSyncDetail(v);
+}
+function renderSyncDetail(v){
+ const {body}=syncDetail,scroll=body.querySelector('.sync-list'),pos=scroll?.scrollTop||0;
+ const summary=crmEl('div','','sync-summary');
+ for(const [label,num]of [['已同步',v.done],['同步中',v.active],['待同步',v.queued],['家庭異常',v.errors]]){const card=crmEl('div');card.append(crmEl('strong',String(num)),crmEl('small',label));summary.append(card);}
+ const msg=crmEl('p','本裝置共 '+v.rows.length+' 戶（含已刪除家庭）；已同步代表該版本已成功寫入並讀回 Drive。其他裝置未同步的修改不在此統計。','muted');
+ const items=crmEl('div','','sync-list');
+ const statuses={active:'正在同步',error:'同步異常',local:'本機儲存中',queued:'等待同步',unnamed:'未命名・待補資料',done:'已同步'};
+ const order={active:0,error:1,local:2,queued:3,unnamed:4,done:5};
+ for(const r of [...v.rows].sort((a,b)=>order[a.kind]-order[b.kind])){
+  const card=crmEl('div','','sync-item'),top=crmEl('div','','sync-item-top');top.append(crmEl('strong',r.name),crmEl('span',statuses[r.kind],'sync-item-'+r.kind));card.append(top);
+  if(r.error)card.append(crmEl('p',r.error,'sync-error'));
+  if(r.kind==='done'&&r.syncedAt)card.append(crmEl('small',new Date(r.syncedAt).toLocaleString()));
+  items.append(card);
+ }
+ if(!v.rows.length)items.append(crmEl('p','尚無家庭資料。','muted'));
+ const settings=crmEl('div','','sync-item');settings.append(crmEl('strong','共用品牌與費率設定'),crmEl('p',v.brandError?'同步異常：'+v.brandError:brandSyncActive?'同步中':brandState.dirty?'等待同步':brandState.remote?'已同步':'無待同步變更',v.brandError?'sync-error':'muted'));
+ const diagnostics=crmEl('div');if(v.connectionError)diagnostics.append(crmEl('p','Drive 連線：'+v.connectionError,'sync-error'));if(v.importError)diagnostics.append(crmEl('p','批次匯入：'+v.importError,'sync-error'));
+ const hint=crmEl('p','可切換家庭、查看資料或試算報價。同步期間請維持 App 開啟，避免重新整理或關閉。','muted');
+ body.replaceChildren(summary,msg,diagnostics,settings,items,hint);items.scrollTop=pos;
+}
+function openSyncDetail(){
+ if(syncDetail?.dlg.open)return;
+ const body=crmEl('div','','sync-detail'),dlg=crmDialog('全域同步明細',body);syncDetail={body,dlg};dlg.addEventListener('close',()=>{if(syncDetail?.dlg===dlg)syncDetail=null;});renderSyncDetail(overview());dlg.showModal();
+}
+
 function list(){const term=$('search').value;$('families').innerHTML=records.filter(r=>!!r.f.archived===archiveView).filter(r=>matchesFamily(r.f,term)).map(r=>'<button data-id="'+esc(r.id)+'" class="'+(r.id===entry?.id?'active':'')+'">'+esc(r.f.name||'未命名家庭')+'<small>'+(r.syncedRev===r.rev&&r.remote?'Drive 已同步':'原瀏覽器草稿')+'</small>'+(r.f.importReview?'<small class="import-review-tag">◷ 舊資料待複核</small>':'')+'</button>').join('');}
 async function openRecord(id){await localChain;entry=records.find(r=>r.id===id);if(!entry)return;undo=[];kind=Object.keys(entry.f.groups)[0];petIndex=0;view='service';pdf=null;await db.put('settings',id,'lastFamily');render();}
 async function newRecord(demo=false){archiveView=false;$('archive').textContent='已刪除家庭';if(photoBusy){toast('請等待照片保存完成');return;}const f=fresh();if(demo){f.name='姆姆家四貓（操作範例）';f.groups.cat.pets=[{name:'姆姆',identity:'白底虎斑',personality:'慢熟，依他的步調靠近'}];f.groups.cat.food.dry={item:'範例飼料',amount:'三分之一',unit:'杯',location:'廚房右側下櫃',leftover:'移出洗碗後放回'};}const r={id:f.id,f,remote:null,rev:1,syncedRev:0};records.push(r);await persist(r);await openRecord(r.id);view='edit';render();}
@@ -194,14 +229,13 @@ currentPDF={result,revision,settings};preview.replaceChildren();for(const data o
 const actions=document.createElement('div');actions.className='actions';actions.append(button('產生／更新 A4 預覽',async()=>{try{await generate();}catch(e){toast('PDF 產生失敗：'+e.message);}},'primary'),button('下載 PDF',async()=>{try{const result=currentPDF?.revision===owner.rev&&currentPDF.settings===brand&&owner===entry?currentPDF.result:await generate();if(!result)return;const finalName=name.value.trim().replace(/[\\/:*?"<>]/g,'_')||result.name;await saveFile(result.blob,finalName.endsWith('.pdf')?finalName:finalName+'.pdf');}catch(e){if(e.name!=='AbortError')toast('下載未完成：'+e.message);}}));intro.append(actions);content.append(intro,preview);}
 async function saveFile(blob,name){if('showSaveFilePicker'in window){try{const handle=await window.showSaveFilePicker({suggestedName:name,startIn:'downloads',types:[{description:'PDF 照護計畫書',accept:{'application/pdf':['.pdf']}}]});const writable=await handle.createWritable();await writable.write(blob);await writable.close();toast('PDF 已儲存到你選擇的位置。');return;}catch(e){if(e.name==='AbortError')return;if(e.name!=='SecurityError'&&e.name!=='NotAllowedError')throw e;}}download(blob,name);toast('PDF 已交給瀏覽器下載。請在系統下載／儲存畫面選擇你的照護計畫書資料夾。');}
 function download(blob,name){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);}
-async function sync(record){if(!record)return;if(!ready()){status();return;}if(syncBusy){schedule();return;}if(!record.f.name.trim()&&!record.f.archived){toast('請先填家庭名稱，再同步 Drive。');return;}if(record.remote&&record.syncedRev===record.rev)return;syncBusy=true;status();const rev=record.rev;const snapshot=structuredClone(record.f);try{await localChain;if(failures.has(record.id))throw Error('本機儲存失敗');for(const p of snapshot.photos)if(!p.driveId){const upload=await drive.upload(p.name,await photoBlob(p),'photo-v1',snapshot.id);p.driveId=upload.id;const live=record.f.photos.find(x=>x.id===p.id);if(live)live.driveId=p.driveId;}if(!record.remote&&!record.reservedId){record.reservedId=await drive.reserve();await persist(record);if(failures.has(record.id))throw Error('本機儲存失敗');}const previousAttempt=record.attemptBase;record.attemptBase=await digest(snapshot);await persist(record);if(failures.has(record.id))throw Error('本機儲存失敗');const saved=await drive.save(snapshot,record.remote,'family-v1',record.reservedId,previousAttempt);const loaded=await drive.load(saved.id);if(loaded.data.id!==snapshot.id||loaded.base!==await digest(snapshot))throw Error('雲端讀回不一致，未標記同步成功');record.remote={id:saved.id,version:loaded.version,etag:loaded.etag,base:loaded.base};record.syncError='';blocked.delete(record.id);record.syncedAt=Date.now();record.syncedRev=rev;await persist(record);}catch(e){record.syncError=e.message;if(e.status===401){forgetGrant();sessionMessage('remember',null);}if(!record.remote&&e.remoteId)record.remote={id:e.remoteId};if(/衝突|條件寫入|儲存失敗|無法安全|權限/.test(e.message)||e.status===403)blocked.add(record.id);else if(ready()){clearTimeout(syncTimer);syncTimer=setTimeout(drain,15000);}if(blocked.has(record.id)&&entry===record&&e.message.includes('衝突')&&!$('foot').textContent.includes('保留本機副本'))$('foot').append(button('保留本機副本並載入雲端版本',resolveConflict));}finally{syncBusy=false;status();list();if(record.rev>rev&&!blocked.has(record.id))schedule();}}
-async function connect(session=null){const id=$('clientId').value.trim()||window.LILI_CONFIG?.googleClientId||localStorage.getItem('liliOAuthClientId')||'';if(!id.endsWith('.apps.googleusercontent.com')){toast('需先設定 App 專用的 Google OAuth 用戶端 ID。');return;}if(connecting||syncBusy)return;connecting=true;try{localStorage.setItem('liliOAuthClientId',id);await drive.connect(id,session);const grant={token:drive.token,expires:drive.expires};sessionMessage('remember',grant);await rememberGrant(db,grant).catch(()=>{});$('setup').close();$('connection').textContent='已連接保姆 Google Drive';const files=await drive.families();for(const file of files){const known=records.find(r=>r.remote?.id===file.id);if(known&&(known.rev!==known.syncedRev||known.remote.base&&known.remote.version===file.version))continue;const loaded=await drive.load(file.id);const f=loaded.data.schema===2?normalize(loaded.data):migrate(loaded.data,legacyText(loaded.data));let r=known||records.find(x=>x.id===f.id);if(r&&r.rev!==r.syncedRev){toast('發現同一家庭的本機未同步修改，保留草稿，沒有覆寫。');continue;}if(!r){r={id:f.id};records.push(r);}Object.assign(r,{f,remote:{id:file.id,version:loaded.version,etag:loaded.etag,base:loaded.base},rev:1,syncedRev:loaded.data.schema===2?1:0});await persist(r);}list();if(entry){entry=records.find(x=>x.id===entry.id);if(entry?.f.archived&&!archiveView)entry=null;render();}await syncBrand(true);blocked.clear();toast('已載入雲端資料，未同步的原瀏覽器草稿會依序同步。');}catch(e){if(e.status===401){forgetGrant();sessionMessage('remember',null);}toast('連線未完成：'+e.message);}finally{connecting=false;schedule();status();}}
+async function sync(record){if(!record)return;if(!ready()){status();return;}if(syncBusy){schedule();return;}if(!record.f.name.trim()&&!record.f.archived){toast('請先填家庭名稱，再同步 Drive。');return;}if(record.remote&&record.syncedRev===record.rev)return;syncBusy=true;activeSyncId=record.id;status();const rev=record.rev;const snapshot=structuredClone(record.f);try{await localChain;if(failures.has(record.id))throw Error('本機儲存失敗');for(const p of snapshot.photos)if(!p.driveId){const upload=await drive.upload(p.name,await photoBlob(p),'photo-v1',snapshot.id);p.driveId=upload.id;const live=record.f.photos.find(x=>x.id===p.id);if(live)live.driveId=p.driveId;}if(!record.remote&&!record.reservedId){record.reservedId=await drive.reserve();await persist(record);if(failures.has(record.id))throw Error('本機儲存失敗');}const previousAttempt=record.attemptBase;record.attemptBase=await digest(snapshot);await persist(record);if(failures.has(record.id))throw Error('本機儲存失敗');const saved=await drive.save(snapshot,record.remote,'family-v1',record.reservedId,previousAttempt);const loaded=await drive.load(saved.id);if(loaded.data.id!==snapshot.id||loaded.base!==await digest(snapshot))throw Error('雲端讀回不一致，未標記同步成功');record.remote={id:saved.id,version:loaded.version,etag:loaded.etag,base:loaded.base};record.syncError='';blocked.delete(record.id);record.syncedAt=Date.now();record.syncedRev=rev;await persist(record);}catch(e){record.syncError=e.message;if(e.status===401){forgetGrant();sessionMessage('remember',null);}if(!record.remote&&e.remoteId)record.remote={id:e.remoteId};if(/衝突|條件寫入|儲存失敗|無法安全|權限/.test(e.message)||e.status===403)blocked.add(record.id);else if(ready()){clearTimeout(syncTimer);syncTimer=setTimeout(drain,15000);}if(blocked.has(record.id)&&entry===record&&e.message.includes('衝突')&&!$('foot').textContent.includes('保留本機副本'))$('foot').append(button('保留本機副本並載入雲端版本',resolveConflict));}finally{syncBusy=false;activeSyncId=null;status();list();if(record.rev>rev&&!blocked.has(record.id))schedule();}}
+async function connect(session=null){const id=$('clientId').value.trim()||window.LILI_CONFIG?.googleClientId||localStorage.getItem('liliOAuthClientId')||'';if(!id.endsWith('.apps.googleusercontent.com')){toast('需先設定 App 專用的 Google OAuth 用戶端 ID。');return;}if(connecting||syncBusy)return;connecting=true;connectionError='';status();try{localStorage.setItem('liliOAuthClientId',id);await drive.connect(id,session);const grant={token:drive.token,expires:drive.expires};sessionMessage('remember',grant);await rememberGrant(db,grant).catch(()=>{});$('setup').close();$('connection').textContent='已連接保姆 Google Drive';const files=await drive.families();for(const file of files){const known=records.find(r=>r.remote?.id===file.id);if(known&&(known.rev!==known.syncedRev||known.remote.base&&known.remote.version===file.version))continue;const loaded=await drive.load(file.id);const f=loaded.data.schema===2?normalize(loaded.data):migrate(loaded.data,legacyText(loaded.data));let r=known||records.find(x=>x.id===f.id);if(r&&r.rev!==r.syncedRev){toast('發現同一家庭的本機未同步修改，保留草稿，沒有覆寫。');continue;}if(!r){r={id:f.id};records.push(r);}Object.assign(r,{f,remote:{id:file.id,version:loaded.version,etag:loaded.etag,base:loaded.base},rev:1,syncedRev:loaded.data.schema===2?1:0});await persist(r);}list();if(entry){entry=records.find(x=>x.id===entry.id);if(entry?.f.archived&&!archiveView)entry=null;render();}await syncBrand(true);blocked.clear();toast('已載入雲端資料，未同步的原瀏覽器草稿會依序同步。');}catch(e){if(e.status===401){forgetGrant();sessionMessage('remember',null);}connectionError=String(e.message||e);toast('連線未完成：'+e.message);}finally{connecting=false;schedule();status();}}
 function dataURL(blob){return new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=()=>no(r.error);r.readAsDataURL(blob);});}
 
-let importingLegacy=false;
 async function importLegacy(file){
  if(importingLegacy||photoBusy)return toast('目前有其他資料正在處理，請稍後再操作。');
- importingLegacy=true;
+ importingLegacy=true;importError='';status();
  try{
   if(file.size>20*1024*1024)throw Error('匯入檔太大，請分批處理');
   if(!ready())throw Error('請先連接 Google Drive 並完成雲端家庭載入，避免重複匯入');
@@ -226,21 +260,21 @@ async function importLegacy(file){
   let count=0;const failed=[];
   for(const f of plan.accepted){
    const r={id:f.id,f,remote:null,rev:1,syncedRev:0};
-   try{await db.put('families',r);records.push(r);count++;}catch(e){failed.push(f.name);}
+   try{await db.put('families',r);records.push(r);count++;}catch(e){failed.push(f.name+'：'+String(e.message||e));}status();
   }
-  list();schedule();
+  if(failed.length)importError=failed.join('\n');list();schedule();
   toast('已新增 '+count+' 戶本機家庭草稿，略過 '+plan.skipped.length+' 戶；將沿用既有 Drive 同步流程。'+(failed.length?'\n未保存：'+failed.join('、'):'')+'\n請確認同步完成後再進行跨瀏覽器驗收。');
- }catch(e){toast('匯入未完成：'+e.message);}finally{importingLegacy=false;$('legacyImportFile').value='';}
+ }catch(e){importError=String(e.message||e);toast('匯入未完成：'+e.message);}finally{importingLegacy=false;$('legacyImportFile').value='';status();}
 }
 async function backup(){if(!entry)return;try{await localChain;const f=structuredClone(entry.f),originals={};for(const p of f.photos)originals[p.id]=await dataURL(await photoBlob(p));download(new Blob([JSON.stringify({format:'lili-homecare-backup',version:2,family:f,originals,brand})],{type:'application/json'}),(f.name||'家庭')+'_完整內部備份.json');toast('完整備份已交給瀏覽器下載，內含原始照片，請勿傳給家長。');}catch(e){toast('備份未完成：'+e.message);}}
 async function restore(file){try{const b=JSON.parse(await file.text());if(b.format!=='lili-homecare-backup'||![1,2].includes(b.version)||!b.originals)throw Error('不是完整備份');const f=b.version===2?normalize(b.family):migrate(b.family,legacyText(b.family));const staged=[];for(const p of f.photos){const data=b.originals[p.id];if(typeof data!=='string'||!data.startsWith('data:'+p.mime+';base64,'))throw Error('照片原檔缺漏：'+p.name);const bytes=Uint8Array.from(atob(data.split(',')[1]),c=>c.charCodeAt(0));if(bytes.length!==p.size)throw Error('照片原檔大小不符');const newId=crypto.randomUUID();staged.push([newId,new Blob([bytes],{type:p.mime})]);p.id=newId;delete p.driveId;}if(!await confirmAction('還原成獨立家庭副本？','會保留現有資料，不會覆蓋同名家庭。','確認還原'))return;for(const[id,blob]of staged)await db.put('photos',blob,id);f.id=crypto.randomUUID();f.name+='（還原副本）';const r={id:f.id,f,remote:null,rev:1,syncedRev:0};records.push(r);await persist(r);await openRecord(r.id);if(b.brand&&['service','promise','contact'].every(k=>typeof b.brand[k]==='string')&&await confirmAction('也還原共用品牌設定？','這會更新本機及後續同步的全家庭共用設定。','還原品牌設定')){brand=readBrand({service:b.brand.service,promise:b.brand.promise,contact:b.brand.contact,rates:b.brand.rates||brandDefaults.rates});brandState.dirty=true;await db.put('settings',brandState,'brandSync');await db.put('settings',brand,'brand');}schedule();toast('已還原為原瀏覽器草稿，請確認內容後同步 Drive。');}catch(e){toast('還原失敗：'+e.message);}finally{$('restoreFile').value='';}}
-$('quickQuote').onclick=()=>quickInquiry();$('new').onclick=()=>newRecord();$('demo').onclick=()=>newRecord(true);$('search').oninput=list;$('families').onclick=e=>{const b=e.target.closest('[data-id]');if(b){if(photoBusy){toast('請等待照片保存完成');return;}openRecord(b.dataset.id);}};$('cloud').onclick=()=>{$('clientId').value=window.LILI_CONFIG?.googleClientId||localStorage.getItem('liliOAuthClientId')||'';$('setup').showModal();};$('closeSetup').onclick=()=>$('setup').close();$('connectSetup').onclick=()=>connect();$('legacyImport').onclick=()=>$('legacyImportFile').click();$('legacyImportFile').onchange=e=>{if(e.target.files[0])importLegacy(e.target.files[0]);};$('restore').onclick=()=>$('restoreFile').click();$('restoreFile').onchange=e=>{if(e.target.files[0])restore(e.target.files[0]);};$('photoFiles').onchange=e=>addPhotos([...e.target.files]);$('closePhoto').onclick=()=>$('lightbox').close();$('lightbox').onclose=()=>{if(photoUrl)URL.revokeObjectURL(photoUrl);photoUrl=null;$('fullPhoto').removeAttribute('src');};window.addEventListener('online',()=>{if(ready())schedule();else resumeConnection();status();});window.addEventListener('offline',status);window.addEventListener('beforeunload',e=>{if(localFailure||photoBusy||[...pending.values()].some(Boolean)){e.preventDefault();e.returnValue='';}});list();const last=await db.get('settings','lastFamily');if(last&&records.some(r=>r.id===last&&!r.f.archived))await openRecord(last);
+$('syncIndicator').onclick=openSyncDetail;$('quickQuote').onclick=()=>quickInquiry();$('new').onclick=()=>newRecord();$('demo').onclick=()=>newRecord(true);$('search').oninput=list;$('families').onclick=e=>{const b=e.target.closest('[data-id]');if(b){if(photoBusy){toast('請等待照片保存完成');return;}openRecord(b.dataset.id);}};$('cloud').onclick=()=>{$('clientId').value=window.LILI_CONFIG?.googleClientId||localStorage.getItem('liliOAuthClientId')||'';$('setup').showModal();};$('closeSetup').onclick=()=>$('setup').close();$('connectSetup').onclick=()=>connect();$('legacyImport').onclick=()=>$('legacyImportFile').click();$('legacyImportFile').onchange=e=>{if(e.target.files[0])importLegacy(e.target.files[0]);};$('restore').onclick=()=>$('restoreFile').click();$('restoreFile').onchange=e=>{if(e.target.files[0])restore(e.target.files[0]);};$('photoFiles').onchange=e=>addPhotos([...e.target.files]);$('closePhoto').onclick=()=>$('lightbox').close();$('lightbox').onclose=()=>{if(photoUrl)URL.revokeObjectURL(photoUrl);photoUrl=null;$('fullPhoto').removeAttribute('src');};window.addEventListener('online',()=>{if(ready())schedule();else resumeConnection();status();});window.addEventListener('offline',status);window.addEventListener('beforeunload',e=>{if(localFailure||photoBusy||[...pending.values()].some(Boolean)){e.preventDefault();e.returnValue='';}});list();const last=await db.get('settings','lastFamily');if(last&&records.some(r=>r.id===last&&!r.f.archived))await openRecord(last);
 
 $('archive').onclick=()=>{archiveView=!archiveView;$('archive').textContent=archiveView?'返回家庭檔案':'已刪除家庭';entry=null;render();};
 $('brandEdit').onclick=()=>{for(const key of Object.keys(brandDefaults))$(key).value=brand[key];$('brandStatus').textContent=brandState.error|| (brandState.dirty?'已存本機，等待雲端同步':brandState.remote?'已同步至 Drive':'此裝置的設定');$('brandDialog').showModal();};
 $('brandClose').onclick=()=>$('brandDialog').close();
 async function syncBrand(pull=false){
- try{
+ brandSyncActive=true;status();try{
   const role='brand-v1',id='shared-brand';if(!brandState.remote||pull){
    const files=await drive.list("'"+drive.root+"' in parents and trashed=false and appProperties has {key='liliRole' and value='brand-v1'}");
    if(files.length>1)throw Error('品牌設定有多份，請先保留本機備份');
@@ -258,7 +292,7 @@ async function syncBrand(pull=false){
   }
   brandState.error='';await db.put('settings',brandState,'brandSync');
  }catch(e){brandState.error=e.message;}
- $('brandEdit').title=brandState.error||'全家庭共用設定';
+ brandSyncActive=false;$('brandEdit').title=brandState.error||'全家庭共用設定';status();
 }
 $('brandSave').onclick=async()=>{const next={...brand,...Object.fromEntries(['service','promise','contact'].map(k=>[k,$(k).value]))};try{brandState.dirty=true;await db.put('settings',brandState,'brandSync');await db.put('settings',next,'brand');brand=next;pdf=null;$('brandDialog').close();render();schedule();toast('品牌設定已存本機，連線後同步到保姆 Drive');}catch(e){toast('品牌設定未保存：'+e.message);}};
 async function sessionMessage(type,value){
