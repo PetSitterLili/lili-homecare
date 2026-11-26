@@ -102,7 +102,7 @@ export function sourceKey(f){return JSON.stringify({cardVersion:2,contact:f.cont
 export function normalize(raw){if(raw?.schema!==2||typeof raw.id!=='string'||typeof raw.name!=='string'||!raw.groups||!Array.isArray(raw.photos)||!Array.isArray(raw.runs)||raw.photos.length>1000||raw.runs.length>1000)throw Error('家庭資料格式不正確');const f=fresh();f.id=raw.id;if(raw.archived===true)f.archived=true;f.name=raw.name;const safeObj=o=>{const result={};for(const[k,v]of Object.entries(o||{})){if(['__proto__','constructor','prototype'].includes(k))continue;if(typeof v==='string'||typeof v==='boolean'||v===null||Array.isArray(v)&&v.every(x=>typeof x==='string'))result[k]=v;}return result;};f.clientRisk={status:['normal','watch','blacklist'].includes(raw.clientRisk?.status)?raw.clientRisk.status:'normal',note:typeof raw.clientRisk?.note==='string'?raw.clientRisk.note:''};f.contact=safeObj(raw.contact);f.booking=safeObj(raw.booking);f.booking.services=Array.isArray(f.booking.services)?f.booking.services:[];f.media={status:['yes','no','pending'].includes(raw.media?.status)?raw.media.status:'pending',note:typeof raw.media?.note==='string'?raw.media.note:''};for(const k of ['decisionEditedAt','legacyConsentFixedAt'])if(typeof raw.media?.[k]==='string')f.media[k]=raw.media[k];if(typeof raw.media?.careNoteRows_note==='string')f.media.careNoteRows_note=raw.media.careNoteRows_note;f.entry=safeObj(raw.entry);f.environment=String(raw.environment||'');f.extra=String(raw.extra||'');for(const k of ['careNoteRows_environment','careNoteRows_extra'])if(typeof raw[k]==='string')f[k]=raw[k];f.updatedAt=typeof raw.updatedAt==='string'?raw.updatedAt:null;f.groups={};for(const kind of ['cat','dog'])if(raw.groups[kind]){const g=blanks(),src=raw.groups[kind];for(const type of Object.keys(g)){if(type==='pets'){g.pets=(Array.isArray(src.pets)?src.pets:[]).slice(0,100).map(safeObj);}else if(type==='food'){for(const t of ['dry','wet','snack'])g.food[t]=safeObj(src.food?.[t]);}else g[type]=safeObj(src[type]);}f.groups[kind]=g;}if(!Object.keys(f.groups).length)throw Error('缺少貓狗資料');f.photos=raw.photos.map(p=>{if(typeof p.id!=='string'||typeof p.name!=='string'||typeof p.caption!=='string'||!['image/jpeg','image/png','image/webp'].includes(p.mime)||typeof p.thumb!=='string'||!/^data:image\/(jpeg|png|webp);base64,/.test(p.thumb)||!Number.isFinite(p.size)||p.size<0)throw Error('照片格式不正確');return {id:p.id,name:p.name,caption:p.caption,mime:p.mime,thumb:p.thumb,size:p.size,...(typeof p.driveId==='string'?{driveId:p.driveId}:{})};});f.runs=raw.runs.map(r=>({id:String(r.id||''),label:String(r.label||''),source:String(r.source||''),tasks:(Array.isArray(r.tasks)?r.tasks:[]).map(t=>({id:String(t.id||''),title:String(t.title||''),detail:String(t.detail||'')})),checks:safeObj(r.checks),createdAt:String(r.createdAt||'')}));if(raw.legacy)f.legacy=raw.legacy;if(raw.importReview===true)f.importReview=true;for(const k of ['importSource','importOriginal','importReviewedAt'])if(typeof raw[k]==='string')f[k]=raw[k];return f;}
 export function migrate(old,oldText){const f=fresh();f.id=old.id;f.name=old.name;f.updatedAt=old.updatedAt;f.photos=old.photos||[];f.legacy=old;f.extra='舊版資料完整保留，請確認後逐步整理到新欄位。\n\n'+oldText;return f;}
 
-import {catPlanNames,displayQuoteLabel,mixedPlan,mixedCare,mixedService} from './quote.mjs?v=2.0.1126.24';
+import {catPlanNames,displayQuoteLabel,mixedPlan,mixedCare,mixedService} from './quote.mjs?v=2.0.1126.25';
 // Legacy service keys remain valid in stored families and visit cards.
 export function serviceName(service,groups){
  if(groups.cat&&groups.dog&&mixedService(service))return mixedPlan;
@@ -170,3 +170,30 @@ export function syncOverview(records,state={}){
  return {rows,done,errors,queued,active,errorCount,tone,label,brandError,connectionError,importError};
 }
 
+
+export function lineHistory(f){
+ return (Array.isArray(f.booking?.lineQuoteHistory)?f.booking.lineQuoteHistory:[]).flatMap(s=>{try{const x=JSON.parse(s);return x&&typeof x.id==='string'&&typeof x.date==='string'&&typeof x.text==='string'?[x]:[];}catch{return [];}}).sort((a,b)=>b.date.localeCompare(a.date));
+}
+// This patch is a source archive, never a formal quote or a payment ledger.
+export function prepareLineHistory(packet,families){
+ if(packet?.format!=='lili-line-history-patch'||packet.version!==1||!Array.isArray(packet.families)||!packet.families.length||packet.families.length>200)throw Error('不是 LINE 歷史報價增量匯入檔');
+ const accepted=[],skipped=[],ids=new Set(),seen=new Set();
+ for(const p of packet.families){
+  if(typeof p.id!=='string'||!p.id||ids.has(p.id)||typeof p.name!=='string'||typeof p.importSource!=='string'||!p.importSource||typeof p.blacklist!=='boolean'||!Array.isArray(p.entries)||p.entries.length>300)throw Error('家庭識別或歷史報價格式有誤');
+  ids.add(p.id);
+  for(const x of p.entries){if(!x||typeof x.id!=='string'||!/^line-[0-9-]+$/.test(x.id)||seen.has(x.id)||typeof x.date!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(x.date)||!Number.isFinite(Date.parse(x.date))||['kind','note','source','text'].some(k=>typeof x[k]!=='string'||x[k].length>30000)||!x.text.trim())throw Error('歷史來源紀錄格式有誤或重複');seen.add(x.id);}
+  const f=families.find(f=>f.id===p.id);
+  if(!f||f.archived||f.importSource!==p.importSource){skipped.push({name:p.name,reason:'找不到相符且未封存的原始家庭 ID／匯入來源'});continue;}
+  const existing=lineHistory(f),existingIds=new Set(existing.map(x=>x.id)),add=p.entries.filter(x=>!existingIds.has(x.id)).map(x=>JSON.stringify({id:x.id,date:x.date,kind:x.kind,note:x.note,source:x.source,text:x.text}));
+  const black=p.blacklist&&f.clientRisk?.status!=='blacklist';
+  if(!add.length&&!black){skipped.push({name:f.name,reason:'已匯入或沒有新增項目'});continue;}
+  accepted.push({id:f.id,name:f.name,add,black});
+ }
+ return {accepted,skipped};
+}
+export function applyLineHistory(f,p){
+ const next=JSON.parse(JSON.stringify(f));
+ next.booking.lineQuoteHistory=[...(next.booking.lineQuoteHistory||[]),...p.add];
+ if(p.black){const old=next.clientRisk?.note||'';next.clientRisk={status:'blacklist',note:[old,'2026-11-26：主理人確認 LINE 暱稱 👤 黑名單標記。'].filter(Boolean).join('\n')};}
+ return next;
+}
