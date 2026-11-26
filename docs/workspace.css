@@ -97,3 +97,5 @@ body{zoom:.8}
 .line-history-text{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;font-size:14px;line-height:1.7}.quick-total{font-size:19px;color:#66596f}
 
 .booking-calendar .booking-selected{background:#e7ddef!important;border:1px solid #b5a1c6!important;font-weight:700}.booking-calendar .booking-occupied{background:#eeeef0;color:#8c8791;opacity:1;cursor:not-allowed}.booking-selection{font-size:14px;color:#66596f;background:#f1edf6;border-radius:10px;padding:10px;overflow-wrap:anywhere;margin:4px 0}
+
+.profile-panel .row{flex-wrap:wrap}.profile-link{display:inline-block;padding:10px 12px;border:1px solid #dcd6e3;border-radius:10px;background:#f2edf6;color:#66596f;text-decoration:none}#familyPager[hidden]{display:none!important}
