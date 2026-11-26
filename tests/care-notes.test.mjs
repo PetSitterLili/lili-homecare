@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {fresh,noteSpecs,noteRows,writeNoteRows,noteCycle,noteActive,bindPendingNotes,activeFamily,expiredNoteWarnings,tasks,sourceKey,normalize} from '../docs/workspace-model.mjs';
+import {fresh,noteSpecs,noteRows,writeNoteRows,noteCycle,noteActive,bindPendingNotes,activeFamily,expiredNoteWarnings,tasks,sourceKey,normalize,prepareLegacyBatch} from '../docs/workspace-model.mjs';
 
 
 const f=fresh(),g=f.groups.cat;
@@ -25,3 +25,23 @@ g.food.dry.enabled=false;let food=lookup(g.food.dry,'note');let foodRows=noteRow
 let pending=fresh();let ps=noteSpecs(pending).find(s=>s.key==='extra');writeNoteRows(ps,[{id:'p',text:'本期',flag:true,temp:true,cycle:'',closed:false}]);pending.booking.segments=[seg('2027-01-01','2027-01-01')];bindPendingNotes(pending);assert(noteRows(ps)[0].cycle===noteCycle(pending),'pending binds');
 assert(sourceKey(f)!==sourceKey(restored),'source change');
 console.log('11 note model checks passed');
+
+
+{
+const old=fresh();old.id='old-a';old.name='測試家庭 A';old.importSource='source-a';old.importOriginal='原始資料';old.booking={dates:'2024-01-01',quote:'old quote',services:['生活照顧']};
+old.contact={phone:'0912345678',address:'測試地址'};
+const packet={format:'lili-homecare-legacy-batch',version:1,families:[old]};
+const batch=prepareLegacyBatch(packet,[]);
+assert(batch.accepted.length===1&&batch.accepted[0].importReview===true,'new marked review');
+assert(batch.accepted[0].booking.services.length===0&&!batch.accepted[0].booking.quote,'old booking not live');
+assert(normalize(JSON.parse(JSON.stringify(batch.accepted[0]))).importOriginal==='原始資料','source retained');
+assert(normalize(batch.accepted[0]).importReview,'review round trip');
+assert(prepareLegacyBatch(packet,batch.accepted).skipped.length===1,'reimport skipped');
+const same={...old,id:'old-b',importSource:'source-b',name:'其他名字'};
+assert(prepareLegacyBatch({...packet,families:[same]},batch.accepted).accepted.length===0,'contact duplicate skipped');
+assert(prepareLegacyBatch({...packet,families:[old,same]},[]).accepted.length===1,'within batch duplicate skipped');
+let bad=false;try{prepareLegacyBatch({...packet,families:[{...old,importOriginal:''}]},[]);}catch{bad=true;}assert(bad,'invalid rejected');
+const reviewed={...batch.accepted[0],importReview:false,importReviewedAt:'2026-11-26'};
+assert(!normalize(reviewed).importReview&&normalize(reviewed).importReviewedAt==='2026-11-26','review completion persists');
+console.log('9 import checks passed');
+}
