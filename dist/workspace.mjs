@@ -1,13 +1,13 @@
-import {inspectCarePatch,applyCarePatch} from './care-patch.mjs?v=2.0.1126.32';
-import {rememberGrant,recallGrant,forgetGrant} from './tab-grant.mjs?v=2.0.1126.32';
-import {displayQuoteLabel,legacyQuoteReference,oldBookingText,hasCurrentBooking,inquiryQuote,mixedPlan,mixedCare,mixedService,defaultRates,readRates,days,travel,rate,holidayRows,quoteKey,savedQuote,quoteLines,money,overtimeText} from './quote.mjs?v=2.0.1126.32';
-import {brandDefaults,readBrand} from './brand.mjs?v=2.0.1126.32';
+import {inspectCarePatch,applyCarePatch} from './care-patch.mjs?v=2.0.1126.33';
+import {rememberGrant,recallGrant,forgetGrant} from './tab-grant.mjs?v=2.0.1126.33';
+import {displayQuoteLabel,legacyQuoteReference,oldBookingText,hasCurrentBooking,inquiryQuote,mixedPlan,mixedCare,mixedService,defaultRates,readRates,days,travel,rate,holidayRows,quoteKey,savedQuote,quoteLines,money,overtimeText} from './quote.mjs?v=2.0.1126.33';
+import {brandDefaults,readBrand} from './brand.mjs?v=2.0.1126.33';
 
-import {sortFamilyDirectory,validServiceDate,taipeiDate,nextBookingDate,orderUpcomingFamilies,recentFamilyIds,profileStages,safeProfileUrl,readProfile,familyArea,profileAge,matchesProfile,prepareProfilePatch,applyProfilePatch,bookingDateGroups,replaceBookingDates,bookingDateLabel,lineHistory,prepareLineHistory,applyLineHistory,syncOverview,matchesFamily,prepareLegacyBatch,noteSpecs,noteRows,writeNoteRows,noteCycle,noteActive,bindPendingNotes,activeFamily,bookingSegments,bookingLines,serviceName,fresh,blanks,fields,titles,day,filename,mediaLabel,warnings,publicBlocks,tasks,sourceKey,normalize,migrate} from './workspace-model.mjs?v=2.0.1126.32';
-import {makeText as legacyText} from './model.mjs?v=2.0.1126.32';
-import {DriveStore,digest} from './drive.mjs?v=2.0.1126.32';
-import {openDB,storeDB} from './drafts.mjs?v=2.0.1126.32';
-import {buildPDF} from './plan-pdf.mjs?v=2.0.1126.32';
+import {sortFamilyDirectory,validServiceDate,taipeiDate,nextBookingDate,orderUpcomingFamilies,recentFamilyIds,profileStages,safeProfileUrl,readProfile,familyArea,profileAge,matchesProfile,prepareProfilePatch,applyProfilePatch,bookingDateGroups,replaceBookingDates,bookingDateLabel,lineHistory,prepareLineHistory,applyLineHistory,syncOverview,matchesFamily,prepareLegacyBatch,noteSpecs,noteRows,writeNoteRows,noteCycle,noteActive,bindPendingNotes,activeFamily,bookingSegments,bookingLines,serviceName,fresh,blanks,fields,titles,day,filename,mediaLabel,warnings,publicBlocks,tasks,sourceKey,normalize,migrate} from './workspace-model.mjs?v=2.0.1126.33';
+import {makeText as legacyText} from './model.mjs?v=2.0.1126.33';
+import {DriveStore,digest} from './drive.mjs?v=2.0.1126.33';
+import {openDB,storeDB} from './drafts.mjs?v=2.0.1126.33';
+import {buildPDF} from './plan-pdf.mjs?v=2.0.1126.33';
 const $=id=>document.getElementById(id),drive=new DriveStore(),db=storeDB(await openDB().catch(error=>{$('main').innerHTML='<div class="panel"><h1>目前無法啟用草稿保存</h1><p>此瀏覽器未能開啟本機資料庫，請換外部瀏覽器或檢查儲存空間；尚未開放填寫，避免資料遺失。</p></div>';throw error;}));
 let records=await db.all(),entry=null,view='service',kind='cat',petIndex=0,undo=[],syncTimer,localChain=Promise.resolve(),syncBusy=false,photoBusy=false,pdf=null,photoUrl=null,localFailure=false;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -378,11 +378,16 @@ async function importCareFields(file){
   const plan=inspectCarePatch(packet,records.map(r=>r.f));
   const body=crmEl('div'),dlg=crmDialog('逐戶預覽照護修正',body),choices=[];
   body.append(crmEl('p','勾選要採用的修正組。同組欄位一起搬移；任一舊值、旗標或家庭來源不符，就整組略過。'));
+  const bulk=crmEl('div','','row'),selectionCount=crmEl('small','','muted');
+  const refreshSelection=()=>{const eligible=choices.filter(({set,c})=>set.result==='ready'&&!c.disabled),selected=eligible.filter(({c})=>c.checked).length;selectionCount.textContent='已勾選 '+selected+'／'+eligible.length+' 組可套用修正';};
+  const setAll=value=>{for(const {set,c} of choices){if(set.result==='ready'&&!c.disabled)c.checked=value;}refreshSelection();};
+  const selectAll=button('全選可套用',()=>setAll(true)),clearAll=button('取消全選',()=>setAll(false));
+  bulk.append(selectAll,clearAll,selectionCount);body.append(bulk);
   for(const h of plan){
    const box=section(h.name,false);
    for(const set of h.sets){
     const label=set.label+(set.result==='done'?'（已匯入）':set.result==='conflict'?'（舊值或來源不符，略過）':'');
-    const c=crmCheck(box.body,label,false);c.disabled=set.result!=='ready';choices.push({h,set,c});
+    const c=crmCheck(box.body,label,false);c.disabled=set.result!=='ready';choices.push({h,set,c});c.addEventListener('change',refreshSelection);
     for(const change of set.changes){
      if(change.before.value===change.after.value&&change.before.rows===change.after.rows)continue;
      const family=records.find(r=>r.id===h.id)?.f;
@@ -416,7 +421,7 @@ async function importCareFields(file){
     dlg.close();undo=[];pdf=null;render();toast('已存本機 '+saved+' 組，略過 '+skipped+' 組。請核對同步狀態。');
    }catch{toast('本次未全部套用。已保存的組別會在下次預覽標為已匯入。');}finally{apply.disabled=false;cancel.disabled=false;}
   },'primary');
-  body.append(apply);await new Promise(resolve=>{dlg.addEventListener('close',resolve,{once:true});dlg.showModal();});
+  refreshSelection();body.append(apply);await new Promise(resolve=>{dlg.addEventListener('close',resolve,{once:true});dlg.showModal();});
  }catch{toast('無法預覽修正檔，請確認格式及家庭來源。');}finally{importingLegacy=false;$('carePatchFile').value='';schedule();status();}
 }
 
