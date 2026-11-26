@@ -1,13 +1,13 @@
-import {inspectCarePatch,applyCarePatch} from './care-patch.mjs?v=2.0.1126.40';
-import {rememberGrant,recallGrant,forgetGrant} from './tab-grant.mjs?v=2.0.1126.40';
-import {displayQuoteLabel,legacyQuoteReference,oldBookingText,hasCurrentBooking,inquiryQuote,mixedPlan,mixedCare,mixedService,defaultRates,readRates,days,travel,rate,holidayRows,quoteKey,savedQuote,quoteLines,money,overtimeText} from './quote.mjs?v=2.0.1126.40';
-import {brandDefaults,readBrand} from './brand.mjs?v=2.0.1126.40';
+import {inspectCarePatch,applyCarePatch} from './care-patch.mjs?v=2.0.1126.41';
+import {rememberGrant,recallGrant,forgetGrant} from './tab-grant.mjs?v=2.0.1126.41';
+import {displayQuoteLabel,legacyQuoteReference,oldBookingText,hasCurrentBooking,inquiryQuote,mixedPlan,mixedCare,mixedService,defaultRates,readRates,days,travel,rate,holidayRows,quoteKey,savedQuote,quoteLines,money,overtimeText} from './quote.mjs?v=2.0.1126.41';
+import {brandDefaults,readBrand} from './brand.mjs?v=2.0.1126.41';
 
-import {sortFamilyDirectory,validServiceDate,taipeiDate,nextBookingDate,orderUpcomingFamilies,recentFamilyIds,profileStages,safeProfileUrl,readProfile,familyArea,profileAge,matchesProfile,prepareProfilePatch,applyProfilePatch,bookingDateGroups,replaceBookingDates,bookingDateLabel,lineHistory,prepareLineHistory,applyLineHistory,syncOverview,matchesFamily,prepareLegacyBatch,noteSpecs,noteRows,writeNoteRows,noteCycle,noteActive,bindPendingNotes,activeFamily,bookingSegments,bookingLines,serviceName,fresh,blanks,fields,titles,day,filename,mediaLabel,warnings,publicBlocks,tasks,sourceKey,normalize,migrate} from './workspace-model.mjs?v=2.0.1126.40';
-import {makeText as legacyText} from './model.mjs?v=2.0.1126.40';
-import {DriveStore,digest} from './drive.mjs?v=2.0.1126.40';
-import {openDB,storeDB} from './drafts.mjs?v=2.0.1126.40';
-import {buildPDF} from './plan-pdf.mjs?v=2.0.1126.40';
+import {sortFamilyDirectory,validServiceDate,taipeiDate,nextBookingDate,orderUpcomingFamilies,recentFamilyIds,profileStages,safeProfileUrl,readProfile,familyArea,profileAge,matchesProfile,prepareProfilePatch,applyProfilePatch,bookingDateGroups,replaceBookingDates,bookingDateLabel,lineHistory,prepareLineHistory,applyLineHistory,syncOverview,matchesFamily,prepareLegacyBatch,noteSpecs,noteRows,writeNoteRows,noteCycle,noteActive,bindPendingNotes,activeFamily,bookingSegments,bookingLines,serviceName,fresh,blanks,fields,titles,day,filename,mediaLabel,warnings,publicBlocks,tasks,sourceKey,normalize,migrate} from './workspace-model.mjs?v=2.0.1126.41';
+import {makeText as legacyText} from './model.mjs?v=2.0.1126.41';
+import {DriveStore,digest} from './drive.mjs?v=2.0.1126.41';
+import {openDB,storeDB} from './drafts.mjs?v=2.0.1126.41';
+import {buildPDF} from './plan-pdf.mjs?v=2.0.1126.41';
 const $=id=>document.getElementById(id),drive=new DriveStore(),db=storeDB(await openDB().catch(error=>{$('main').innerHTML='<div class="panel"><h1>目前無法啟用草稿保存</h1><p>此瀏覽器未能開啟本機資料庫，請換外部瀏覽器或檢查儲存空間；尚未開放填寫，避免資料遺失。</p></div>';throw error;}));
 let records=await db.all(),entry=null,view='service',kind='cat',petIndex=0,undo=[],syncTimer,localChain=Promise.resolve(),syncBusy=false,photoBusy=false,pdf=null,photoUrl=null,localFailure=false;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -86,7 +86,7 @@ function restoreView(pos){if(!pos)return;for(const [el,key] of detailKeys($('mai
 function keepDialogPosition(d){const show=d.showModal.bind(d),close=d.close.bind(d);let before=null,key=null;d.showModal=()=>{if(!d.open){before=capturePosition();key=currentViewKey();}return show();};d.close=(...args)=>{const wasOpen=d.open;const result=close(...args);if(wasOpen&&key===currentViewKey())restorePosition(before);return result;};return d;}
 function rememberView(key,pos){if(!key)return;viewPositions.delete(key);viewPositions.set(key,pos);if(viewPositions.size>60)viewPositions.delete(viewPositions.keys().next().value);}
 
-const familyPageSize=8;
+const familyPageSize=14;
 let familySort='upcoming',familyFilters={},recentSearchIds=recentFamilyIds(await db.get('settings','recentFamilySearch').catch(()=>[])),recentSave=Promise.resolve();
 function saveRecentSearch(id){recentSearchIds=id?recentFamilyIds(recentSearchIds,id):[];const copy=[...recentSearchIds];recentSave=recentSave.catch(()=>{}).then(()=>db.put('settings',copy,'recentFamilySearch')).catch(()=>{toast('本機搜尋紀錄未能保存');});}
 function renderRecentSearch(){const el=$('recentFamilySearch'),items=$('recentFamilyItems');items.replaceChildren();const available=recentSearchIds.map(id=>records.find(r=>r.id===id&&!r.f.archived)).filter(Boolean);el.hidden=archiveView||!!$('search').value.trim()||!available.length||Object.values(familyFilters).some(v=>Array.isArray(v)?v.length:!!v);if(el.hidden)return;for(const r of available){const b=button(r.f.name||'未命名家庭',()=>{if(photoBusy)return toast('請等待照片保存完成');saveRecentSearch(r.id);openRecord(r.id);},'recent-family-chip');items.append(b);}}

@@ -183,3 +183,6 @@ dialog.family-filter-dialog[open]{display:flex;flex-direction:column}
 #main[data-risk=blacklist] .filehead h1,#main[data-risk=blacklist] .filehead .muted{color:#fff}
 #families .family-card-open[data-pending-action=true].active{background:#fff0df!important;border-color:#e8c39f!important;color:#65566f!important}
 #families .family-card-open[data-pending-action=true][data-risk=blacklist] .risk-tag{color:#45434a}
+
+/* Family directory: slightly larger type, unchanged two-column mobile layout. */
+#families .family-card-open{font-size:17px}#families .family-card-open small{font-size:12px}#families .family-card-open .upcoming-family-tag{font-size:13px}@media(max-width:620px){#families .family-card-open{font-size:14px}}
