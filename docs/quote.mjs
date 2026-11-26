@@ -15,3 +15,43 @@ export function savedQuote(f){try{const q=JSON.parse(f.booking.quote||'null');re
 export const money=n=>'NT$'+n.toLocaleString('en-US');
 export function quoteLines(f){const q=savedQuote(f);if(!q||q.key!==quoteKey(f))return [];return [...q.rows.map(x=>(f.groups.cat&&f.groups.dog&&mixedService(x.k?.split('|')[0])?x.min+' 分鐘'+mixedPlan:x.label)+'｜'+money(x.unit)+' × '+x.n+' 趟 = '+money(x.unit*x.n)),...(q.adjust?[q.adjust<0?'優惠折抵：'+money(-q.adjust):'額外服務費：'+money(q.adjust)]:[]),...(!q.exclude?q.holidays.map(h=>h.name+' '+(h.spans?.join('、')||h.a+'～'+h.b)+'｜'+money(h.fee)+' × '+h.n+' 趟 = '+money(h.total)):[]),'本次照護費用合計：'+money(q.total),'以上已含每趟車馬費 '+money(q.travel)+'（單程 '+q.km+' 公里）。'];}
 export function overtimeText(b){return b.overtime===true&&Number(b.overtimeFee)>0?'每趟照護皆以完成雙方原先約定的照護內容為原則。若因毛寶突發嘔吐、環境需額外清整、健康異常或其他臨時狀況，而有必要延長照護時間，將視現場情況與家長聯繫，並依每 15 分鐘 NT$'+Number(b.overtimeFee).toLocaleString('en-US')+' 計收加時照護費用。如遇緊急狀況，將優先以毛寶的健康與安全為考量。':'';}
+
+export function inquiryQuote(input,r=defaultRates){
+ const c=Number(input.c),d=Number(input.d),walk=input.walk||'unknown',med=input.med||'unknown';
+ const result={options:[],warnings:[],message:'',error:''};
+ if(!Number.isSafeInteger(c)||!Number.isSafeInteger(d)||c<0||d<0||c+d===0){result.error='請輸入正確的喵寶、犬寶數量（至少一位）。';return result;}
+ const kmRaw=String(input.km??'').trim(),km=Number(kmRaw),tripsRaw=String(input.trips??'').trim(),trips=Number(tripsRaw);
+ if(kmRaw&&(!Number.isFinite(km)||km<0||Math.abs(km*10-Math.round(km*10))>1e-8)){result.error='單程公里請填非負數，最多一位小數。';return result;}
+ if(tripsRaw&&(!Number.isSafeInteger(trips)||trips<1||trips>10000)){result.error='預估趟數請填 1～10000 的整數。';return result;}
+ const tv=kmRaw?travel(km):null;
+ result.travel=tv;result.travelKnown=!!kmRaw&&tv!==null;
+ const base='餐食飲水、食器清洗、如廁清潔、基本健康觀察及環境整理。';
+ const add=(s,title,detail,recommended=false,reference=false)=>{
+  const x=rate(c,d,s,r);if(!x)return;
+  result.options.push({service:s,title,detail,recommended,reference,fee:x.fee,min:x.min,unit:result.travelKnown?x.fee+tv:null,total:result.travelKnown&&tripsRaw&&!reference?(x.fee+tv)*trips:null});
+ };
+ if(c&&d){
+  add(mixedPlan,mixedPlan,mixedCare,walk!=='long',walk==='long');
+  if(walk==='long')result.warnings.push('較長時間散步須個別評估與報價；所列僅為標準整合照護參考。');
+ }else if(d){
+  add('生活照顧','犬寶生活照顧方案',base+' 不含散步。',walk==='no',walk==='yes'||walk==='long');
+  add('照顧＋散步','犬寶照顧＋散步方案',base+' 包含散步及返家基本清潔。',walk==='yes',walk==='long');
+  if(walk==='long')result.warnings.push('較長時間散步須先確認實際需求，以上非長時間散步正式報價。');
+ }else{
+  add('生活照顧','喵寶生活照顧方案',base);
+  add('陪伴專案','喵寶生活照顧與陪伴專案',base+' 增加陪伴時間，依毛寶意願安排互動、遊戲及安撫。');
+ }
+ if(!result.options.length)result.warnings.push(d>=3?'三位犬寶以上的散步方案暫不開放；此家庭需個別評估照護及報價。':'此家庭規模須個別評估承接與報價。');
+ if(med==='yes')result.warnings.push('有醫囑／餵藥需求，請提供對象、藥品、份量、頻率及操作方式，確認能否承接及是否需調整時間與報價。');
+ if(med==='unknown')result.warnings.push('如有餵藥或特殊健康照護需求，請事先告知。');
+ if(kmRaw&&tv===null)result.warnings.push('單程 30.1 公里以上，車馬費另行評估。');
+ const lines=['您好～依目前'+[c?c+' 位喵寶':'',d?d+' 位犬寶':''].filter(Boolean).join('＋')+'的家庭配置，先提供以下方案供您參考：'];
+ for(const o of result.options){
+  lines.push('',(o.recommended?'推薦｜':o.reference?'參考｜':'')+o.title,o.min+' 分鐘｜'+money(o.fee)+'／趟（不含車馬費）',o.detail);
+  if(o.unit!==null)lines.push('含車馬費 '+money(o.unit)+'／趟'+(o.total!==null?'；預估 '+trips+' 趟共 '+money(o.total):''));
+ }
+ if(result.options.length)lines.push('',result.travelKnown?'車馬費：單程 '+km+' 公里，每趟 '+money(tv)+'。':'車馬費依實際單程機車導航距離另計。');
+ if(result.warnings.length)lines.push('',...result.warnings);
+ lines.push('','以上為一般檔期初步詢價，特殊檔期加價、實際服務時間及承接情況，待確認日期與照護需求後另行確認。');
+ result.message=lines.join('\n');return result;
+}
