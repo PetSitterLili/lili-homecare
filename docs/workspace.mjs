@@ -88,8 +88,8 @@ function careNoteField(spec,label,placeholder){
    function paint(){
     const active=noteActive(f,n);
     flagGroup.dataset.flag=n.flag?'yes':'no';flagGroup.dataset.temp=n.temp?'yes':'no';
-    flag.setAttribute('aria-pressed',String(n.flag));flag.setAttribute('aria-label',n.flag?'取消加入照護小卡':'加入照護小卡');flag.title=n.flag?'取消旗標':'加入小卡';
-    state.textContent=n.closed?'已結束・保留歷史':!active?'上期事項・待重新確認':n.temp?'僅限本期': '';
+    flag.setAttribute('aria-pressed',String(n.flag));flag.setAttribute('aria-label',n.flag?'取消加入照護小卡':'加入照護小卡');flag.title=(n.flag?'取消旗標':'加入小卡')+(n.temp?'・僅限本期':'');
+    state.textContent=n.closed?'已結束・保留歷史':!active?'上期事項・待重新確認':'';
     state.hidden=!state.textContent;line.classList.toggle('care-note-expired',!active);end.hidden=!n.temp||n.closed;
     for(let i=0;i<options.length;i++){const [,v,t]=options[i];menu.children[i].classList.toggle('active',!n.closed&&active&&v===n.flag&&t===n.temp);}
    }
