@@ -159,3 +159,5 @@ dialog.family-filter-dialog[open]{display:flex;flex-direction:column}
 #clearRecentFamilySearch{font-size:12px;padding:1px 4px;min-height:24px;background:transparent;border:0}
 #recentFamilyItems{display:flex;gap:5px;overflow-x:auto;scrollbar-width:thin;padding-bottom:3px}
 #recentFamilyItems .recent-family-chip{flex:none;font-size:12px;min-height:34px;padding:5px 9px;border-radius:9px;background:#f3eff7;max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.family-sort-row{display:flex;align-items:center;gap:7px;margin:0 0 8px;font-size:12px;color:#817888}.family-sort-row select{flex:1;width:auto;min-width:0;font-size:13px;padding:5px 7px;border-radius:8px;background:#fff;color:#66596f}
