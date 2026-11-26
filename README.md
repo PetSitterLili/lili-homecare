@@ -35,3 +35,7 @@ node --check dist/workspace.mjs
 node --check dist/plan-pdf.mjs
 
 靜態目錄為 dist。舊版檔案保留供回退，index.html 使用 workspace.mjs。部署與真實 Drive 完成前不宣稱正式可用。
+
+## 後續介面調整
+
+下次優先檢視手機內部工作介面的按鈕尺寸與留白，以及分頁切換和滑動瀏覽的手感。

@@ -1,11 +1,11 @@
-import {rememberGrant,recallGrant,forgetGrant} from './tab-grant.mjs?v=2.0.1126.2';
-import {brandDefaults} from './brand.mjs?v=2.0.1126.2';
+import {rememberGrant,recallGrant,forgetGrant} from './tab-grant.mjs?v=2.0.1126.3';
+import {brandDefaults} from './brand.mjs?v=2.0.1126.3';
 
-import {fresh,blanks,fields,titles,day,filename,mediaLabel,warnings,publicBlocks,tasks,sourceKey,normalize,migrate} from './workspace-model.mjs?v=2.0.1126.2';
-import {makeText as legacyText} from './model.mjs?v=2.0.1126.2';
-import {DriveStore,digest} from './drive.mjs?v=2.0.1126.2';
-import {openDB,storeDB} from './drafts.mjs?v=2.0.1126.2';
-import {buildPDF} from './plan-pdf.mjs?v=2.0.1126.2';
+import {fresh,blanks,fields,titles,day,filename,mediaLabel,warnings,publicBlocks,tasks,sourceKey,normalize,migrate} from './workspace-model.mjs?v=2.0.1126.3';
+import {makeText as legacyText} from './model.mjs?v=2.0.1126.3';
+import {DriveStore,digest} from './drive.mjs?v=2.0.1126.3';
+import {openDB,storeDB} from './drafts.mjs?v=2.0.1126.3';
+import {buildPDF} from './plan-pdf.mjs?v=2.0.1126.3';
 const $=id=>document.getElementById(id),drive=new DriveStore(),db=storeDB(await openDB().catch(error=>{$('main').innerHTML='<div class="panel"><h1>目前無法啟用草稿保存</h1><p>此瀏覽器未能開啟本機資料庫，請換外部瀏覽器或檢查儲存空間；尚未開放填寫，避免資料遺失。</p></div>';throw error;}));
 let records=await db.all(),entry=null,view='service',kind='cat',petIndex=0,undo=[],syncTimer,localChain=Promise.resolve(),syncBusy=false,photoBusy=false,pdf=null,photoUrl=null,localFailure=false;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -131,7 +131,7 @@ function renderPhotos(content){const intro=document.createElement('div');intro.c
 async function thumbnail(blob){const url=URL.createObjectURL(blob);try{const img=await new Promise((ok,no)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=()=>no(Error('照片無法讀取'));i.src=url;});const factor=Math.min(1,400/Math.max(img.width,img.height)),c=document.createElement('canvas');c.width=Math.max(1,Math.round(img.width*factor));c.height=Math.max(1,Math.round(img.height*factor));c.getContext('2d').drawImage(img,0,0,c.width,c.height);return c.toDataURL('image/jpeg',.72);}finally{URL.revokeObjectURL(url);}}
 async function addPhotos(files){if(photoBusy||!entry)return;photoBusy=true;status();const target=entry;try{snapshot();for(const file of files){if(!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size>40*1024*1024)throw Error('支援 40 MB 以下 JPG、PNG、WebP');const p={id:crypto.randomUUID(),name:file.name,caption:'',mime:file.type,size:file.size,thumb:await thumbnail(file)};await db.put('photos',file,p.id);target.f.photos.push(p);target.rev++;await persist(target);if(failures.has(target.id))throw Error('照片資料尚未完整保存，請檢查本機空間');}schedule();toast('照片已保存原瀏覽器草稿；雲端狀態請看上方提示。');}catch(e){toast(e.message);}finally{photoBusy=false;$('photoFiles').value='';render();}}
 async function renderPlan(content){let currentPDF;const owner=entry;const intro=document.createElement('div');intro.className='panel';intro.append(heading('家長的 A4 照護計畫書'));const p=document.createElement('p');p.className='pdfnote';p.textContent='只包含照護文字與品牌插圖，沒有內部照片。檔名日期依台灣下載當天自動帶入。';intro.append(p);const name=document.createElement('input');name.value=filename(entry.f);name.setAttribute('aria-label','PDF 檔名');intro.append(name);const preview=document.createElement('div');preview.className='preview';preview.hidden=true;
-async function generate(){const warn=warnings(entry.f);if(warn.length&&!await confirmAction('有 '+warn.length+' 項資料待確認',warn.join('\n')+'\n\n仍可產生預覽，待確認事項會標在文件內。','仍產生預覽'))return null;if(owner!==entry||!content.isConnected)return null;const revision=owner.rev,settings=brand;
+async function generate(){const warn=warnings(entry.f);if(warn.length&&!await confirmAction('有 '+warn.length+' 項資料待確認',warn.join('\n')+'\n\n這份提醒只供保姆補問。仍可預覽給家長的計畫書。','仍產生預覽'))return null;if(owner!==entry||!content.isConnected)return null;const revision=owner.rev,settings=brand;
 const result=await buildPDF(structuredClone(owner.f),{...settings});
 if(owner!==entry||owner.rev!==revision||brand!==settings||!content.isConnected)return null;
 currentPDF={result,revision,settings};preview.replaceChildren();for(const data of result.pages){const img=document.createElement('img');img.src=data;img.alt='A4 照護計畫書預覽';preview.append(img);}preview.hidden=false;return result;}
