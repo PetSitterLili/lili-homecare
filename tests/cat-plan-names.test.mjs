@@ -1,0 +1,21 @@
+import assert from 'node:assert/strict';
+import {inquiryQuote,displayQuoteLabel,quoteKey,quoteLines,mixedPlan} from '../docs/quote.mjs';
+import {fresh,serviceName,bookingLines} from '../docs/workspace-model.mjs';
+
+const names=(c)=>inquiryQuote({c,d:0,km:'0',med:'no'}).options.map(x=>x.title);
+for(const c of [1,2,3,6,7,20])assert.deepEqual(names(c),['生活照顧方案','陪伴專案']);
+assert.deepEqual(inquiryQuote({c:3,d:0,km:'0',med:'no'}).options.map(x=>[x.min,x.fee]),[[45,600],[60,950]]);
+assert.deepEqual(inquiryQuote({c:7,d:0,km:'0',med:'no'}).options.map(x=>[x.min,x.fee]),[[60,800],[90,1400]]);
+const f=fresh();f.groups.cat.pets.push({name:'test'});
+assert.equal(serviceName('生活照顧',f.groups),'生活照顧方案');
+assert.equal(serviceName('陪伴專案',f.groups),'陪伴專案');
+const oldLabel='60 分鐘喵寶'+'生活照顧'+'與陪伴專案';
+assert.equal(displayQuoteLabel({label:oldLabel}),'60 分鐘陪伴專案');
+f.booking.segments=[JSON.stringify({a:'2026-12-01',b:'2026-12-01',visits:[{service:'陪伴專案',minutes:'60',start:'',end:'',note:''}]})];
+assert(bookingLines(f.booking,f.groups).some(x=>x.includes('60 分鐘陪伴專案')));
+const raw=JSON.stringify({key:quoteKey(f),rows:[{k:'陪伴專案|60',label:oldLabel,min:60,n:1,unit:650}],holidays:[],total:650});
+f.booking.quote=raw;
+assert(quoteLines(f).some(x=>x.includes('60 分鐘陪伴專案｜NT$650')));
+assert.equal(f.booking.quote,raw);
+assert.equal(inquiryQuote({c:2,d:2,km:'0',med:'no'}).options[0].title,mixedPlan);
+assert(inquiryQuote({c:1,d:0,km:'0',med:'no'}).message.includes('簡易點藥或其他個別健康照護依事先約定'));
