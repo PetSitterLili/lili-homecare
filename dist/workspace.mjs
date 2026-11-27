@@ -1,13 +1,13 @@
-import {inspectCarePatch,applyCarePatch,prepareFoodRefinement} from './care-patch.mjs?v=2.0.1126.64';
-import {rememberGrant,recallGrant,forgetGrant} from './tab-grant.mjs?v=2.0.1126.64';
-import {displayQuoteLabel,legacyQuoteReference,oldBookingText,hasCurrentBooking,inquiryQuote,quickPeriodQuote,mixedPlan,mixedCare,mixedService,defaultRates,readRates,days,travel,rate,rateBasis,holidayRows,quoteKey,savedQuote,quoteLines,money,overtimeText} from './quote.mjs?v=2.0.1126.64';
-import {brandDefaults,readBrand} from './brand.mjs?v=2.0.1126.64';
+import {inspectCarePatch,applyCarePatch,prepareFoodRefinement} from './care-patch.mjs?v=2.0.1126.65';
+import {rememberGrant,recallGrant,forgetGrant} from './tab-grant.mjs?v=2.0.1126.65';
+import {displayQuoteLabel,legacyQuoteReference,oldBookingText,hasCurrentBooking,inquiryQuote,quickPeriodQuote,mixedPlan,mixedCare,mixedService,defaultRates,readRates,days,travel,rate,rateBasis,holidayRows,quoteKey,savedQuote,quoteLines,money,overtimeText} from './quote.mjs?v=2.0.1126.65';
+import {brandDefaults,readBrand} from './brand.mjs?v=2.0.1126.65';
 
-import {dedupeLegacySupplies,withoutLegacyLabel,tidyLegacySupplies,clearCareFlags,relocateLegacyHospital,validReservation,reservationPeriods,readLineReservations,reservationLines,reservationSegments,inspectLineReservations,applyLineReservations,sortFamilyDirectory,validServiceDate,taipeiDate,nextBookingDate,bookingPriority,orderUpcomingFamilies,recentFamilyIds,profileStages,safeProfileUrl,readProfile,familyArea,profileAge,matchesProfile,prepareProfilePatch,applyProfilePatch,bookingDateGroups,replaceBookingDates,bookingDateLabel,lineHistory,prepareLineHistory,applyLineHistory,syncOverview,matchesFamily,prepareLegacyBatch,noteSpecs,noteRows,writeNoteRows,noteCycle,noteActive,bindPendingNotes,activeFamily,bookingSegments,bookingLines,serviceName,fresh,blanks,fields,titles,day,filename,mediaLabel,warnings,publicBlocks,tasks,sourceKey,normalize,migrate} from './workspace-model.mjs?v=2.0.1126.64';
-import {makeText as legacyText} from './model.mjs?v=2.0.1126.64';
-import {DriveStore,digest} from './drive.mjs?v=2.0.1126.64';
-import {openDB,storeDB} from './drafts.mjs?v=2.0.1126.64';
-import {buildPDF,auditLegacyCoverage} from './plan-pdf.mjs?v=2.0.1126.64';
+import {dedupeLegacySupplies,withoutLegacyLabel,tidyLegacySupplies,clearCareFlags,relocateLegacyHospital,validReservation,reservationPeriods,readLineReservations,reservationLines,reservationSegments,inspectLineReservations,applyLineReservations,sortFamilyDirectory,validServiceDate,taipeiDate,nextBookingDate,bookingPriority,orderUpcomingFamilies,recentFamilyIds,profileStages,safeProfileUrl,readProfile,familyArea,profileAge,matchesProfile,prepareProfilePatch,applyProfilePatch,bookingDateGroups,replaceBookingDates,bookingDateLabel,lineHistory,prepareLineHistory,applyLineHistory,syncOverview,matchesFamily,prepareLegacyBatch,noteSpecs,noteRows,writeNoteRows,noteCycle,noteActive,bindPendingNotes,activeFamily,bookingSegments,bookingLines,serviceName,fresh,blanks,fields,titles,day,filename,mediaLabel,warnings,publicBlocks,tasks,sourceKey,normalize,migrate} from './workspace-model.mjs?v=2.0.1126.65';
+import {makeText as legacyText} from './model.mjs?v=2.0.1126.65';
+import {DriveStore,digest} from './drive.mjs?v=2.0.1126.65';
+import {openDB,storeDB} from './drafts.mjs?v=2.0.1126.65';
+import {buildPDF,auditLegacyCoverage} from './plan-pdf.mjs?v=2.0.1126.65';
 const $=id=>document.getElementById(id),drive=new DriveStore(),db=storeDB(await openDB().catch(error=>{$('main').innerHTML='<div class="panel"><h1>目前無法啟用草稿保存</h1><p>此瀏覽器未能開啟本機資料庫，請換外部瀏覽器或檢查儲存空間；尚未開放填寫，避免資料遺失。</p></div>';throw error;}));
 let records=await db.all(),entry=null,view='service',kind='cat',petIndex=0,undo=[],syncTimer,localChain=Promise.resolve(),syncBusy=false,photoBusy=false,pdf=null,photoUrl=null,localFailure=false;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1060,30 +1060,49 @@ function buildCustomStudio(root,conditions){
  root.append(heading('進階報價工作室'),state,source,basis,applyBasis);
  const work=section('照護工時與額外負荷',true),g=crmEl('div','','crm-fields');
  const taskPanel=crmEl('div','','task-estimator'),taskGrid=crmEl('div','','crm-fields'),taskInfo=crmEl('div','','crm-result');
- taskPanel.append(crmEl('p','按實際需要執行的任務填數量；沒有該任務填 0，未知留空。時間係數只是可修改的暫定估值，不是已驗證的標準。','muted'),taskGrid);
- const taskDefs=[['floors','需照護樓層',3],['zones','獨立／隔離空間',4],['bowls','需洗一般碗',2],['feeders','需拆洗餵食器碗',3],['fountains','需拆洗飲水機',10],['litter','需清理貓砂盆',4],['refill','只補給、不洗的點位',1]];
- const tasks=taskDefs.map(([key,label,rate])=>{const i=crmInput(taskGrid,label,'');i.min=key==='floors'?'1':'0';i.step='1';return {key,label,rate,i};});
- const coeff=section('每項任務時間係數（暫定，可調）',false),cg=crmEl('div','','crm-fields');coeff.body.append(cg);
- for(const t of tasks){t.r=crmInput(cg,t.label+'／分鐘',String(t.rate));t.r.min='0';t.r.step='0.5';}
- const setup=crmInput(taskGrid,'備料／收尾分鐘','10'),spot=crmInput(taskGrid,'地面／落屑清潔分鐘',''),special=crmInput(taskGrid,'個別照護／其他分鐘','');
- for(const i of [setup,spot,special]){i.min='0';i.step='1';}
- taskPanel.append(coeff.e,crmEl('p','一般碗不含餵食器碗；只補給點位不含已列為清洗的設備。樓層係數只計額外樓層，隔離空間只計進出與阻擋動物等額外流程。砂盆係數為一般清理，不含全盆拆洗。','muted'),taskInfo);
+ taskPanel.append(crmEl('p','先填同一趟要照護的設備與空間，再切換服務深度。沒有的項目填 0；未知數量留空。','muted'));
+ const depth=crmEl('select');depth.setAttribute('aria-label','清洗深度');for(const [v,t] of [['full','全細洗｜完整清洗'],['refill','純補不洗｜補給＋砂盆'],['maintenance','維護洗｜指定數量清洗']]){const o=crmEl('option',t);o.value=v;depth.append(o);}taskPanel.append(depth,taskGrid);
+ const devices=[['bowls','一般食／水碗',1.5,.5],['feeders','餵食器碗',2,.75],['fountains','自動飲水機',8,1]].map(([key,label,full,refill])=>{const i=crmInput(taskGrid,label+'數量','');i.min='0';i.step='1';return {key,label,full,refill,i};});
+ const litter=crmInput(taskGrid,'貓砂盆數量',''),floors=crmInput(taskGrid,'照護樓層數','1'),zones=crmInput(taskGrid,'獨立照護空間數','1'),doors=crmInput(taskGrid,'需擋貓的門禁進出次數','');
+ for(const i of [litter,floors,zones,doors]){i.min='0';i.step='1';}floors.min='1';zones.min='1';
+ const waterLabel=labelText(crmEl('label'),'水源／備品位置'),water=crmEl('select');for(const [v,t] of [['local','各層可就近取用'],['shared','集中一處，需跨樓層搬運']]){const o=crmEl('option',t);o.value=v;water.append(o);}waterLabel.append(water);taskGrid.append(waterLabel);
+ const partial=crmEl('div','','crm-fields task-partial');taskPanel.append(partial);for(const d of devices){d.wash=crmInput(partial,d.label+'需洗數量','0');d.wash.min='0';d.wash.step='1';}
+ const extras=section('清潔、回報與額外搬運',true),eg=crmEl('div','','crm-fields');extras.body.append(eg);
+ const setup=crmInput(eg,'備料／收尾分鐘','10'),spot=crmInput(eg,'地面／落屑清潔分鐘','0'),special=crmInput(eg,'個別照護／其他分鐘','0'),report=crmInput(eg,'照護日誌／回報分鐘','8'),runs=crmInput(eg,'額外往返搬運分鐘','0');
+ for(const i of [setup,spot,special,report,runs]){i.min='0';i.step='1';}
+ const coeff=section('每項時間係數與預留（暫定，可調）',false),cg=crmEl('div','','crm-fields');coeff.body.append(cg);
+ const coef=(label,value)=>{const i=crmInput(cg,label,String(value));i.min='0';i.step='0.25';return i;};
+ for(const d of devices){d.rFull=coef(d.label+'清洗／分',d.full);d.rRefill=coef(d.label+'補給／分',d.refill);}
+ const litterRate=coef('每盆砂盆清理與拍照',2.5),floorLocal=coef('每額外樓層・就近取用',2),floorShared=coef('每額外樓層・集中搬運',5),zoneRate=coef('每額外空間整理切換',1),doorRate=coef('每次門禁擋貓',1),bufferLow=coef('順利預留％',10),bufferHigh=coef('較慢預留％',20);
+ const rateHint=crmEl('p','係數為依整體與分區實務工時初步校準的可調估值，不是逐項實測。清洗含移除剩食、擦乾、補給及復位；餵食器僅洗碗，不含整機維修。砂盆含一般清理與拍照，軟便、嘔吐、全盆洗等額外工作另計。樓層搬運與門禁分開，不重複加時間。','muted');
+ taskPanel.append(extras.e,coeff.e,rateHint,taskInfo);
  work.body.append(taskPanel,g);
  const base=crmInput(g,'基礎照護分鐘',''),floor=crmInput(g,'樓層額外分鐘','0'),clean=crmInput(g,'清潔額外分鐘','0'),extra=crmInput(g,'其他任務分鐘','0'),recovery=crmInput(g,'案後整理分鐘','0');for(const i of [base,floor,clean,extra,recovery])i.min='0';
  const baseFields=[base,floor,clean,extra].map(i=>i.closest('label'));
  function taskEstimate(){
-  const invalid=[],parts=[];for(const t of tasks){const n=nonnegative(t.i),r=nonnegative(t.r);if(n===null||!Number.isSafeInteger(n)||t.key==='floors'&&n<1||r===null){invalid.push(t.label);continue;}const units=t.key==='floors'?n-1:n;parts.push([t.label,units,r,units*r]);}
-  for(const [label,i] of [['備料／收尾',setup],['地面／落屑清潔',spot],['個別照護／其他',special]]){const n=nonnegative(i);if(n===null)invalid.push(label);else parts.push([label,1,n,n]);}
-  return {invalid,parts,total:parts.reduce((a,p)=>a+p[3],0)};
+  const invalid=[],parts=[],quantity=(i,label,min=0)=>{const n=nonnegative(i);if(n===null||!Number.isSafeInteger(n)||n<min){invalid.push(label);return null;}return n;},add=(label,n,r)=>{if(n===null)return;if(!Number.isFinite(r)||r<0){invalid.push(label+'係數');return;}parts.push([label,n,r,n*r]);};
+  for(const d of devices){const n=quantity(d.i,d.label);if(n===null)continue;const washed=depth.value==='full'?n:depth.value==='refill'?0:quantity(d.wash,d.label+'需洗數量');if(washed===null)continue;if(washed>n){invalid.push(d.label+'清洗數超過總數');continue;}if(washed)add(d.label+'清洗',washed,nonnegative(d.rFull));if(n-washed)add(d.label+'純補給',n-washed,nonnegative(d.rRefill));}
+  const l=quantity(litter,'貓砂盆'),f=quantity(floors,'照護樓層',1),z=quantity(zones,'獨立空間',1),d=quantity(doors,'門禁進出次數');
+  add('砂盆清理與拍照',l,nonnegative(litterRate));add('額外樓層與搬運',f===null?null:f-1,nonnegative(water.value==='shared'?floorShared:floorLocal));add('額外空間切換',z===null?null:z-1,nonnegative(zoneRate));add('門禁擋貓',d,nonnegative(doorRate));
+  for(const [label,i] of [['備料／收尾',setup],['地面／落屑清潔',spot],['個別照護／其他',special],['照護日誌／回報',report],['額外搬運',runs]]){const n=nonnegative(i);if(n===null)invalid.push(label);else parts.push([label,1,n,n]);}
+  const raw=parts.reduce((a,p)=>a+p[3],0),lo=nonnegative(bufferLow),hi=nonnegative(bufferHigh);if(lo===null||hi===null||lo>hi||hi>100)invalid.push('預留比例（0～100％，順利不得高於較慢）');
+  const round=n=>Math.ceil(n/5)*5,valid=invalid.length===0,low=valid?round(raw*(1+lo/100)):null,high=valid?round(raw*(1+hi/100)):null,total=valid?round(raw*(1+(lo+hi)/200)):raw;
+  return {invalid,parts,raw,total,low,high};
  }
  function taskMode(){return basis.value==='manual';}
- function displayTaskMode(){const manual=taskMode();taskPanel.hidden=!manual;for(const x of baseFields)x.hidden=manual;}
+ function displayTaskMode(){const manual=taskMode();taskPanel.hidden=!manual;partial.hidden=depth.value!=='maintenance';for(const x of baseFields)x.hidden=manual;}
 
  const loads=section('主觀難度與承接意願',true),lg=crmEl('div','','crm-fields');loads.body.append(lg);
  const stars=crmInput(lg,'主觀負荷 0～5 星','0');stars.min='0';stars.max='5';
  const willingness=crmEl('select');for(const [v,t] of [['unknown','尚待評估'],['yes','願意承接'],['price','報酬合理即可'],['conditional','須先調整合作條件'],['no','目前不考慮承接']]){const o=crmEl('option',t);o.value=v;willingness.append(o);}loads.body.append(willingness,crmEl('p','星級只記錄負荷，不擅自換算成未確認的加價。','muted'));
  const rates=section('內部勞務時薪與交通',true),rg=crmEl('div','','crm-fields');rates.body.append(rg);
  const baseRate=crmInput(rg,'基礎時薪',''),suggestRate=crmInput(rg,'建議時薪',''),wishRate=crmInput(rg,'意願時薪',''),travelInput=crmInput(rg,'車程費用（選填）',''),premium=crmInput(rg,'獨立額外費用','0');for(const i of [baseRate,suggestRate,wishRate,travelInput,premium])i.min='0';
+ const rateNote=crmEl('p','','muted');rates.body.append(rateNote);
+ function standardWage(){const c=conditions(),n=Number(c.c),d=Number(c.d);if(d!==0||!Number.isSafeInteger(n)||n<1)return null;const count=Math.min(n,6),r=currentRates(),x=rate(count,0,'生活照顧',r),y=rate(count,0,'陪伴專案',r);return x&&y?{base:Math.round(x.fee*60/x.min),suggest:Math.round(y.fee*60/y.min),count}:null;}
+ const wageButton=button('帶入常態價目換算時薪',()=>{const r=standardWage();if(!r)return;baseRate.value=String(r.base);suggestRate.value=String(r.suggest);wishRate.value=String(r.suggest);render();});rates.body.append(wageButton);
+ let seededWage=false;
+ function taskWages(){const r=standardWage();wageButton.hidden=!taskMode()||!r;rateNote.textContent=taskMode()&&r?'內部時薪參考：現行 '+(r.count<=2?'1～2':'3～6')+' 貓方案換算 '+money(r.base)+'／'+money(r.suggest)+'，不代表多貓適用正式價目；意願價預設同建議價，可自行調整。':'';if(taskMode()&&!root.hidden&&!seededWage&&r&&[baseRate,suggestRate,wishRate].every(i=>i.value==='')){baseRate.value=String(r.base);suggestRate.value=String(r.suggest);wishRate.value=String(r.suggest);seededWage=true;}}
+
  const result=crmEl('div','','crm-result'),anchorSection=section('定價錨點庫（本機）',false),ag=crmEl('div','','crm-fields');anchorSection.body.append(crmEl('p','僅存此瀏覽器，不會寫進公開網站、Google Drive 或家庭檔案。建議使用匿名代稱。','muted'),ag);
  const file=crmEl('input');file.type='file';file.accept='.json,application/json';file.hidden=true;anchorSection.body.prepend(button('匯入歷史錨點 JSON',()=>file.click(),'primary'),file);
  const name=crmInput(ag,'錨點名稱','','text'),memo=crmEl('textarea');memo.placeholder='任務、執行人數、歷史報酬、實際工時、再次承接意願等';anchorSection.body.append(memo);
@@ -1099,10 +1118,10 @@ function buildCustomStudio(root,conditions){
  anchorSection.body.append(save,saved);
  function drawAnchors(){saved.replaceChildren();if(!anchors.length)saved.append(crmEl('p','目前沒有本機錨點，可先用任務拆解試算。','muted'));for(const a of anchors){const row=crmEl('div','','booking-visit');row.append(crmEl('strong',a.name),crmEl('p',a.kind==='context'?'僅供情境及承接條件參考':a.min+' 分鐘｜'+money(a.hourly)+'／小時'),crmEl('p',a.memo||'無補充','muted'),button('刪除錨點',async()=>{if(!await confirmAction('刪除錨點？','只刪除此瀏覽器內的參考資料。','刪除'))return;const old=anchors;anchors=anchors.filter(x=>x.id!==a.id);if(!persist()){anchors=old;return;}refreshRefs();drawAnchors();},'clear'));saved.append(row);}}
  function refreshRefs(){const old=basis.value,c=conditions(),cn=Number(c.c),dn=Number(c.d),standard=(lastQ?.options||[]).filter(o=>Number.isFinite(o.fee)&&o.min>0).map((o,i)=>({id:'standard-'+i,name:'現行價目參考｜'+o.title,min:o.min,hourly:Math.round(o.fee*60/o.min)}));const matches=anchors.filter(a=>a.kind!=='context'&&Number.isFinite(a.min)&&a.min>0&&Number.isFinite(a.hourly)&&a.hourly>0&&Number.isSafeInteger(a.catsMin)&&Number.isSafeInteger(a.catsMax)&&a.dogs===dn&&cn>0&&a.catsMax>0).map(a=>{const delta=cn<a.catsMin?a.catsMin-cn:cn>a.catsMax?cn-a.catsMax:0;return {...a,delta,match:delta<=Math.max(3,Math.ceil(a.catsMax*.25))};}).filter(a=>a.match).sort((a,b)=>a.delta-b.delta||Number(b.preferred===true)-Number(a.preferred===true));const ids=new Set(matches.map(a=>a.id));refs=[{id:'manual',name:'依任務自行試算',min:null,hourly:null},...matches,...standard,...anchors.filter(a=>a.kind!=='context'&&!ids.has(a.id))];basis.replaceChildren();for(const a of refs){const o=crmEl('option',(a.match?'相近參考｜':'')+a.name);o.value=a.id;basis.append(o);}const best=recommended()||standard[0];if(manualChoice&&refs.some(x=>x.id===old))basis.value=old;else if(best)basis.value=best.id;else basis.value='manual';applyBasis.disabled=basis.value==='manual';const chosen=refs.find(a=>a.id===basis.value);source.textContent=chosen?.match?'參考 '+chosen.catsMin+'～'+chosen.catsMax+' 喵、'+chosen.dogs+' 犬：'+chosen.min+' 分鐘／'+money(chosen.hourly)+' 每小時。'+(chosen.delta?'目前數量超出錨點範圍 '+chosen.delta+' 隻，請核對工作量；不自動線性外推。':'仍需核對任務與環境。')+' '+(chosen.memo||''):standard.length?'可採現行價目作為工時／費率參考。':anchors.length?'未找到足夠相近的數量及物種錨點，可手動參考其他案例。':'尚未匯入歷史錨點；請先從下方錨點庫匯入。';const values=[base,baseRate,suggestRate,wishRate].map(x=>x.value),untouched=autoValues&&values.every((v,i)=>v===autoValues[i]);if(!root.hidden&&!manualChoice){if(best&&(values.every(v=>v==='')||untouched&&autoRef!==best.id))applyReference();else if(!best&&untouched){for(const x of [base,baseRate,suggestRate,wishRate])x.value='';autoValues=null;autoRef='';}else if(best&&autoRef!==best.id&&values.some(v=>v!==''))source.textContent+='｜已保留你手動輸入的數值，請確認是否重新帶入。';}}
- basis.onchange=()=>{manualChoice=true;applyBasis.disabled=basis.value==='manual';const a=refs.find(x=>x.id===basis.value);source.textContent=a&&a.id!=='manual'?(a.memo||'現行價目或本機參考')+'｜'+a.min+' 分鐘／'+money(a.hourly)+' 每小時。請核對工作量，不自動外推。':'依實際設備、空間與任務估算，不沿用歷史工時。';if(taskMode()&&autoValues){for(const [j,x] of [baseRate,suggestRate,wishRate].entries())if(x.value===autoValues[j+1])x.value='';}render();};
+ basis.onchange=()=>{manualChoice=true;applyBasis.disabled=basis.value==='manual';const a=refs.find(x=>x.id===basis.value);source.textContent=a&&a.id!=='manual'?(a.memo||'現行價目或本機參考')+'｜'+a.min+' 分鐘／'+money(a.hourly)+' 每小時。請核對工作量，不自動外推。':'依實際設備、空間與任務估算，不沿用歷史工時。';if(taskMode()&&autoValues){for(const [j,x] of [baseRate,suggestRate,wishRate].entries())if(x.value===autoValues[j+1])x.value='';seededWage=false;}render();};
  function render(){const c=conditions(),blocked=Number(c.d)>=3;state.textContent='沿用快速詢價條件：'+(c.c||'0')+' 喵／'+(c.d||'0')+' 犬'+(c.km!==''?'｜'+c.km+' 公里':'')+(blocked?'｜超出現行承接範圍，僅內部試算':'');
- displayTaskMode();const est=taskMode()?taskEstimate():null;
- if(est){taskInfo.textContent=['已知任務小計：'+Math.round(est.total*10)/10+' 分鐘（暫估）',...est.parts.filter(p=>p[3]>0).map(p=>p[0]+'：'+p[1]+' × '+p[2]+' = '+Math.round(p[3]*10)/10+' 分鐘'),...(est.invalid.length?['尚缺：'+est.invalid.join('、')]:['任務工時合計：'+Math.ceil(est.total)+' 分鐘'])].join('\n');}
+ displayTaskMode();taskWages();const est=taskMode()?taskEstimate():null;
+ if(est){taskInfo.textContent=[...(est.invalid.length?['已知任務小計：'+Math.round(est.raw*10)/10+' 分鐘（非完整工時）']:['建議抓 '+est.total+' 分鐘｜預估區間 '+est.low+'～'+est.high+' 分鐘（含預留）','純任務小計：'+Math.round(est.raw*10)/10+' 分鐘']),...est.parts.filter(p=>p[3]>0).map(p=>p[0]+'：'+p[1]+' × '+p[2]+' = '+Math.round(p[3]*10)/10+' 分鐘'),...(est.invalid.length?['尚缺／需修正：'+est.invalid.join('、')]:[])].join('\n');}
  const minutes=est?[est.invalid.length?null:Math.ceil(est.total),nonnegative(recovery)]:[base,floor,clean,extra,recovery].map(nonnegative),valid=minutes.every(n=>n!==null)&&minutes.reduce((a,b)=>a+b,0)>0&&(est?est.total>0:positive(base)!==null);
  const total=minutes.reduce((a,b)=>a+(b||0),0),tr=nonnegative(travelInput)??(c.km!==''?travel(Number(c.km)):null),x=nonnegative(premium);
  const lines=['預估總工時：'+(valid?total+' 分鐘':'待確認')];for(const [label,i] of [['基礎價',baseRate],['建議價',suggestRate],['意願價',wishRate]]){const r=positive(i);if(!valid||r===null||x===null){lines.push(label+'：待輸入');continue;}const amount=Math.round(total*r/60+x+(tr??0));lines.push(label+'：'+money(amount)+'／趟'+(tr===null?'（未含車程）':''));if(lastQ?.trips&&!lastQ.error&&tr!==null)lines.push('　檔期及趟數合計：'+money(amount*lastQ.trips+lastQ.holidayTotal));}

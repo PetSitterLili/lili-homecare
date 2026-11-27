@@ -273,3 +273,5 @@ dialog.family-filter-dialog[open]{display:flex;flex-direction:column}
 .custom-quote-studio{scroll-margin-top:80px}.custom-quote-studio .crm-result{overflow-wrap:anywhere}
 
 .task-estimator[hidden],.custom-quote-studio label[hidden]{display:none!important}.task-estimator{display:grid;gap:8px}.task-estimator .crm-result{font-size:13px;line-height:1.7}.task-estimator .crm-fields{margin-bottom:8px}.task-estimator p{margin:3px 0}
+
+.task-partial[hidden],.task-estimator [hidden]{display:none!important}.task-estimator>select{margin-bottom:4px}.task-estimator .task-partial{background:#f5f1f7;padding:8px;border-radius:9px}.task-estimator .crm-result{white-space:pre-line}
