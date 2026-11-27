@@ -1,13 +1,13 @@
-import {inspectCarePatch,applyCarePatch,prepareFoodRefinement} from './care-patch.mjs?v=2.0.1126.56';
-import {rememberGrant,recallGrant,forgetGrant} from './tab-grant.mjs?v=2.0.1126.56';
-import {displayQuoteLabel,legacyQuoteReference,oldBookingText,hasCurrentBooking,inquiryQuote,mixedPlan,mixedCare,mixedService,defaultRates,readRates,days,travel,rate,holidayRows,quoteKey,savedQuote,quoteLines,money,overtimeText} from './quote.mjs?v=2.0.1126.56';
-import {brandDefaults,readBrand} from './brand.mjs?v=2.0.1126.56';
+import {inspectCarePatch,applyCarePatch,prepareFoodRefinement} from './care-patch.mjs?v=2.0.1126.57';
+import {rememberGrant,recallGrant,forgetGrant} from './tab-grant.mjs?v=2.0.1126.57';
+import {displayQuoteLabel,legacyQuoteReference,oldBookingText,hasCurrentBooking,inquiryQuote,quickPeriodQuote,mixedPlan,mixedCare,mixedService,defaultRates,readRates,days,travel,rate,holidayRows,quoteKey,savedQuote,quoteLines,money,overtimeText} from './quote.mjs?v=2.0.1126.57';
+import {brandDefaults,readBrand} from './brand.mjs?v=2.0.1126.57';
 
-import {dedupeLegacySupplies,withoutLegacyLabel,tidyLegacySupplies,clearCareFlags,relocateLegacyHospital,validReservation,reservationPeriods,readLineReservations,reservationLines,reservationSegments,inspectLineReservations,applyLineReservations,sortFamilyDirectory,validServiceDate,taipeiDate,nextBookingDate,orderUpcomingFamilies,recentFamilyIds,profileStages,safeProfileUrl,readProfile,familyArea,profileAge,matchesProfile,prepareProfilePatch,applyProfilePatch,bookingDateGroups,replaceBookingDates,bookingDateLabel,lineHistory,prepareLineHistory,applyLineHistory,syncOverview,matchesFamily,prepareLegacyBatch,noteSpecs,noteRows,writeNoteRows,noteCycle,noteActive,bindPendingNotes,activeFamily,bookingSegments,bookingLines,serviceName,fresh,blanks,fields,titles,day,filename,mediaLabel,warnings,publicBlocks,tasks,sourceKey,normalize,migrate} from './workspace-model.mjs?v=2.0.1126.56';
-import {makeText as legacyText} from './model.mjs?v=2.0.1126.56';
-import {DriveStore,digest} from './drive.mjs?v=2.0.1126.56';
-import {openDB,storeDB} from './drafts.mjs?v=2.0.1126.56';
-import {buildPDF,auditLegacyCoverage} from './plan-pdf.mjs?v=2.0.1126.56';
+import {dedupeLegacySupplies,withoutLegacyLabel,tidyLegacySupplies,clearCareFlags,relocateLegacyHospital,validReservation,reservationPeriods,readLineReservations,reservationLines,reservationSegments,inspectLineReservations,applyLineReservations,sortFamilyDirectory,validServiceDate,taipeiDate,nextBookingDate,orderUpcomingFamilies,recentFamilyIds,profileStages,safeProfileUrl,readProfile,familyArea,profileAge,matchesProfile,prepareProfilePatch,applyProfilePatch,bookingDateGroups,replaceBookingDates,bookingDateLabel,lineHistory,prepareLineHistory,applyLineHistory,syncOverview,matchesFamily,prepareLegacyBatch,noteSpecs,noteRows,writeNoteRows,noteCycle,noteActive,bindPendingNotes,activeFamily,bookingSegments,bookingLines,serviceName,fresh,blanks,fields,titles,day,filename,mediaLabel,warnings,publicBlocks,tasks,sourceKey,normalize,migrate} from './workspace-model.mjs?v=2.0.1126.57';
+import {makeText as legacyText} from './model.mjs?v=2.0.1126.57';
+import {DriveStore,digest} from './drive.mjs?v=2.0.1126.57';
+import {openDB,storeDB} from './drafts.mjs?v=2.0.1126.57';
+import {buildPDF,auditLegacyCoverage} from './plan-pdf.mjs?v=2.0.1126.57';
 const $=id=>document.getElementById(id),drive=new DriveStore(),db=storeDB(await openDB().catch(error=>{$('main').innerHTML='<div class="panel"><h1>目前無法啟用草稿保存</h1><p>此瀏覽器未能開啟本機資料庫，請換外部瀏覽器或檢查儲存空間；尚未開放填寫，避免資料遺失。</p></div>';throw error;}));
 let records=await db.all(),entry=null,view='service',kind='cat',petIndex=0,undo=[],syncTimer,localChain=Promise.resolve(),syncBusy=false,photoBusy=false,pdf=null,photoUrl=null,localFailure=false;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -918,7 +918,61 @@ function quickInquiry(f=null){
  const med=choose(form,'是否需要餵藥／特殊醫囑',[['unknown','尚未確認'],['no','沒有'],['yes','有，需確認細節']],'unknown');
  const walk=choose(form,'犬寶散步需求',[['unknown','尚未確認'],['no','不需要'],['yes','一般散步'],['long','較長時間散步']],'unknown');
  const km=crmInput(form,'單程機車導航公里（選填）',f?(readProfile(f.profile).km||savedQuote(f)?.km||''):'','number','0.1');km.min='0';km.placeholder='未知可留空';
- const trips=crmInput(form,'預估總趟數（選填）','');trips.min='1';trips.placeholder='未知可留空';form.append(button('更新試算',()=>{draw();},'primary'));
+ const periodBox=crmEl('div','','booking-visit quick-period-box'),periodList=crmEl('div','','quick-period-list'),periodSummary=crmEl('p','','muted');
+ body.append(periodBox);periodBox.append(heading('照護日期（選填）'),crmEl('p','不填日期即可試算常態單趟費用；不同日期的每日趟數可分段設定。','muted'),periodList);
+ const periods=[];
+ const today=taipeiDate(),startMonth=()=>new Date(Number(today.slice(0,4)),Number(today.slice(5,7))-1,1);
+ const dateLabel=p=>p.a?(p.a.replace(/-/g,'/')+(p.b&&p.b!==p.a?' ～ '+p.b.replace(/-/g,'/'):'')):'選擇照護日期';
+ function closeCalendar(p){p.calendar.hidden=true;p.pick.setAttribute('aria-expanded','false');p.anchor='';}
+ function showCalendar(p){
+  for(const other of periods)if(other!==p)closeCalendar(other);
+  p.anchor='';p.calendar.hidden=false;p.pick.setAttribute('aria-expanded','true');
+  if(p.a)p.month=new Date(Number(p.a.slice(0,4)),Number(p.a.slice(5,7))-1,1);
+  paintCalendar(p);
+ }
+ function updatePeriod(p){p.pick.textContent=dateLabel(p);p.wheelWrap.hidden=!p.a;p.remove.hidden=!p.a&&periods.length===1;}
+ function paintCalendar(p){
+  const nav=crmEl('div','','quick-calendar-nav'),year=p.month.getFullYear(),month=p.month.getMonth(),holidays=currentRates().holiday;
+  const prev=button('‹',()=>{p.month.setMonth(month-1);paintCalendar(p);}),next=button('›',()=>{p.month.setMonth(month+1);paintCalendar(p);});
+  prev.setAttribute('aria-label','上個月');next.setAttribute('aria-label','下個月');
+  nav.append(prev,crmEl('strong',year+' 年 '+(month+1)+' 月'),next);
+  const cal=crmEl('div','','booking-calendar');
+  for(const d of ['日','一','二','三','四','五','六'])cal.append(crmEl('small',d));
+  for(let i=0;i<p.month.getDay();i++)cal.append(crmEl('span'));
+  for(let d=1;d<=new Date(year,month+1,0).getDate();d++){
+   const iso=year+'-'+String(month+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+   const chosen=!!p.a&&p.a<=iso&&iso<=(p.b||p.a);
+   const cell=button(String(d),()=>{
+    if(!p.anchor){p.a=iso;p.b=iso;p.anchor=iso;updatePeriod(p);paintCalendar(p);}
+    else{const dates=[p.anchor,iso].sort();p.a=dates[0];p.b=dates[1];updatePeriod(p);closeCalendar(p);}
+    draw();
+   },chosen?'booking-selected':'');
+   cell.setAttribute('aria-pressed',String(chosen));cell.setAttribute('aria-label',iso);
+   if(holidays.some(h=>h.active&&h.a<=iso&&iso<=h.b)){cell.classList.add('quick-holiday-day');cell.title='特殊檔期';}
+   cal.append(cell);
+  }
+  const hint=crmEl('small',p.anchor?'再點結束日期，單日可直接完成。':'點選開始日期，再點結束日期。','muted');
+  const done=button('完成',()=>closeCalendar(p));done.disabled=!p.a;
+  const foot=crmEl('div','','quick-calendar-foot');foot.append(hint,done);
+  p.calendar.replaceChildren(nav,cal,foot);
+ }
+ function addPeriod(open=false){
+  const row=crmEl('div','','quick-period-row'),top=crmEl('div','','quick-period-top'),rec={row,a:'',b:'',n:1,anchor:'',month:startMonth()};
+  rec.pick=button('選擇照護日期',()=>rec.calendar.hidden?showCalendar(rec):closeCalendar(rec),'quick-date-pick');rec.pick.setAttribute('aria-expanded','false');
+  rec.remove=button('×',()=>{periods.splice(periods.indexOf(rec),1);row.remove();if(!periods.length)addPeriod();for(const p of periods)updatePeriod(p);draw();},'clear');rec.remove.setAttribute('aria-label','清除日期區間');
+  rec.calendar=crmEl('div','','quick-calendar-panel');rec.calendar.hidden=true;
+  const wheel=crmEl('div','','booking-wheel quick-count-wheel'),sc=crmEl('div','','booking-scroll');
+  sc.setAttribute('aria-label','每日出勤次數');rec.wheelWrap=crmEl('div','','quick-wheel-wrap');rec.wheelWrap.append(crmEl('span','每日出勤'),wheel);wheel.append(sc);
+  const setN=n=>{if(rec.n!==n){rec.n=n;draw();}for(const [i,item] of [...sc.children].entries())item.setAttribute('aria-pressed',String(i+1===rec.n));};
+  let timer;
+  for(let n=1;n<=4;n++){const item=button(n+' 趟',()=>{clearTimeout(timer);sc.scrollTop=(n-1)*32;setN(n);});item.setAttribute('aria-pressed',String(n===1));sc.append(item);}
+  sc.addEventListener('scroll',()=>{clearTimeout(timer);timer=setTimeout(()=>{if(sc.isConnected&&!rec.wheelWrap.hidden)setN(Math.max(1,Math.min(4,Math.round(sc.scrollTop/32)+1)));},90);});
+  top.append(rec.pick,rec.remove);row.append(top,rec.calendar,rec.wheelWrap);periods.push(rec);periodList.append(row);
+  for(const p of periods)updatePeriod(p);
+  if(open)showCalendar(rec);
+ }
+ addPeriod();periodBox.append(button('＋ 新增日期區間',()=>{const empty=periods.find(p=>!p.a);if(empty)showCalendar(empty);else addPeriod(true);draw();}),periodSummary);
+ const advanced=section('檔期優惠（選填）',false),exclude=crmCheck(advanced.body,'本次免收特殊檔期加成',false);advanced.body.append(crmEl('p','只影響這次試算，不修改價目表或家庭專屬價。','muted'));periodBox.append(advanced.e);
  body.append(crmEl('p','車程費用可等地址確認後再算；餵藥不自動加價，需依照護內容評估。','muted'));
  const cards=crmEl('div','','quick-options');body.append(cards);
  let legacyMinutes=null,legacyService=null,legacyOut=null;
@@ -943,17 +997,29 @@ function quickInquiry(f=null){
  const output=crmEl('div','','quick-output');output.append(heading('可直接貼到 LINE 的回覆'),preview,copy);body.append(output);
  function draw(){
   walk.parentElement.hidden=!(Number(dogs.value)>0);
-  const q=inquiryQuote({c:cats.value===''?NaN:cats.value,d:dogs.value===''?NaN:dogs.value,med:med.value,walk:walk.value,km:km.value,trips:trips.value},currentRates());
+  const q=quickPeriodQuote({c:cats.value===''?NaN:cats.value,d:dogs.value===''?NaN:dogs.value,med:med.value,walk:walk.value,km:km.value,periods:periods.map(p=>({a:p.a,b:p.b,n:p.n})),excludeHoliday:exclude.checked},currentRates());
+  periodSummary.textContent=q.error?'請確認日期、毛寶數量及車程欄位。':q.trips?'共 '+q.trips+' 趟｜'+q.dateLabel:'尚未指定日期・常態單趟報價';
+  advanced.e.hidden=!q.trips;
   cards.replaceChildren();
   if(q.error){cards.append(crmEl('p',q.error,'issue'));if(legacyOut)legacyOut.textContent=q.error;preview.value='';output.hidden=true;copy.disabled=true;return;}
   for(const o of q.options){
    const card=crmEl('div','','booking-visit');card.append(crmEl('strong',(o.recommended?'推薦｜':o.reference?'參考｜':'')+o.title),crmEl('strong',o.min+' 分鐘 · '+money(o.unit??o.fee)+'／趟','quick-price'),crmEl('p',o.detail));
-   if(o.unit!==null)card.append(crmEl('small','已含車程費用'),...(o.total!==null?[crmEl('strong',trips.value+' 趟預估總額 '+money(o.total),'quick-total')]:[]));else {card.append(crmEl('small','內部基礎費率；尚未計入車程費用，不直接對外報價'));const n=Number(trips.value);if(!o.reference&&Number.isSafeInteger(n)&&n>0&&n<=10000)card.append(crmEl('strong',n+' 趟照護費小計 '+money(o.fee*n)),crmEl('small','未含車程費用，僅內部參考'));}
+   if(o.unit!==null)card.append(crmEl('small','已含車程費用（單趟常態費率）'));else card.append(crmEl('small','內部基礎費率；尚未計入車程費用，不直接對外報價'));
+   if(q.trips&&!o.reference){
+    const breakdown=crmEl('div','','crm-result quick-breakdown');
+    const base=o.normalTotal??o.baseTotal;
+    breakdown.append(crmEl('p','一般費用 '+money(o.unit??o.fee)+' × '+q.trips+' 趟 = '+money(base)));
+    for(const h of q.holidays)breakdown.append(crmEl('p',h.name+'｜'+h.spans.map(s=>s.replace(/-/g,'/')).join('、')+'｜'+h.n+' 趟 × '+money(h.fee)+' = '+money(h.total)+(q.excluded?'（本次免收）':'')));
+    if(!q.holidays.length)breakdown.append(crmEl('p','無適用的特殊檔期加成','muted'));
+    if(o.total!==null)breakdown.append(crmEl('strong','本次預估合計 '+money(o.total),'quick-total'));
+    else breakdown.append(crmEl('strong','照護費小計 '+money(o.baseTotal+q.holidayTotal),'quick-total'),crmEl('small','未含車程費用，僅供內部參考'));
+    card.append(breakdown);
+   }
    cards.append(card);
   }
   if(q.travelKnown)cards.append(crmEl('p','每趟車程費用 '+money(q.travel),'muted'));
   for(const msg of q.warnings)cards.append(crmEl('p',msg,'issue'));
-  cards.append(crmEl('p','一般檔期參考；特殊檔期及正式預約仍須另行確認。','muted'));
+  cards.append(crmEl('p',q.trips?'已依所選日期與現行檔期規則試算；不代表已成立預約。':'常態檔期參考；特殊檔期及正式預約仍須另行確認。','muted'));
   if(legacyOut){const a=legacyQuoteReference(Number(cats.value),Number(dogs.value),legacyService.value,legacyMinutes.value,currentRates());if(a){const total=q.travelKnown?a.estimate+q.travel:null;legacyOut.textContent=['時間最接近的現行方案：'+a.nearest.title+'｜'+a.nearest.min+' 分鐘／'+money(a.nearest.fee+(q.travelKnown?q.travel:0))+(q.travelKnown?'（含車程費用）':'（照護費參考）'),'依原規格試算：以 '+a.basis.title+' '+a.basis.min+' 分鐘的費率為基準',legacyMinutes.value+' 分鐘 ÷ 60 × '+money(a.hourly)+'／小時（時薪顯示四捨五入）','比例試算照護費 '+money(a.estimate)+(total!==null?'；含車程費用 '+money(total)+'／趟':''),'非正式報價，須由保姆確認最低服務時間、照護內容與承接意願。'].join('\n');}else legacyOut.textContent=legacyMinutes.value?'此規格需個別評估，無可用的標準比例參考。':'輸入分鐘數，即可比較最接近的現行方案。';}preview.value=q.message;output.hidden=false;copy.disabled=false;
  }
  body.addEventListener('input',draw);body.addEventListener('change',draw);draw();dlg.showModal();

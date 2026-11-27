@@ -77,3 +77,62 @@ export function oldBookingText(f){
  return m?m[1].trim():'';
 }
 export function hasCurrentBooking(rs,today){return rs.some(s=>s.b>=today);}
+
+
+// Temporary quote only; uses the same current fees and holiday intersections as formal booking quotes.
+export function quickPeriodQuote(input,r=defaultRates){
+ const result=inquiryQuote({...input,trips:''},r);
+ if(result.error)return result;
+ const periods=input.periods??[];
+ const fail=message=>({...result,error:message,message:'',options:[]});
+ if(!Array.isArray(periods)||periods.length>100)return fail('日期區間格式有誤。');
+ const validDate=s=>typeof s==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(s)&&Number.isFinite(Date.parse(s))&&new Date(s+'T00:00:00Z').toISOString().slice(0,10)===s;
+ const selected=[];
+ for(const p of periods){
+  if(!p||typeof p!=='object')return fail('日期區間格式有誤。');
+  const a=String(p.a??''),b=String(p.b??''),n=Number(p.n);
+  if(!a&&!b)continue;
+  if(!validDate(a)||!validDate(b||a)||a>(b||a))return fail('請確認開始與結束日期；單日可只填開始日期。');
+  if(!Number.isSafeInteger(n)||n<1||n>4)return fail('每日出勤次數請選 1～4 趟。');
+  selected.push({a,b:b||a,visits:Array.from({length:n},()=>({}))});
+ }
+ selected.sort((a,b)=>a.a.localeCompare(b.a));
+ if(selected.some((p,i)=>i>0&&p.a<=selected[i-1].b))return fail('日期區間有重疊，請調整，避免重複計費。');
+ const trips=selected.reduce((n,p)=>n+days(p.a,p.b)*p.visits.length,0);
+ if(trips>10000)return fail('出勤總趟數超過試算範圍，請縮短日期區間。');
+ result.periods=selected;result.trips=trips;result.holidays=[];result.holidayTotal=0;
+ if(!trips)return result;
+ result.holidays=holidayRows(selected,r);
+ const excluded=input.excludeHoliday===true;
+ result.holidayTotal=excluded?0:result.holidays.reduce((n,h)=>n+h.total,0);
+ result.excluded=excluded&&result.holidays.length>0;
+ const short=s=>s.replace(/-/g,'/');
+ const dates=selected.map(p=>(p.a===p.b?short(p.a):short(p.a)+'～'+short(p.b))+'（每日 '+p.visits.length+' 趟）');
+ result.dateLabel=dates.join('、');
+ for(const o of result.options){
+  o.baseTotal=o.reference?null:o.fee*trips;
+  o.normalTotal=o.reference||o.unit===null?null:o.unit*trips;
+  o.holidayTotal=o.reference?null:result.holidayTotal;
+  o.total=o.normalTotal===null?null:o.normalTotal+result.holidayTotal;
+ }
+ const visible=result.options.filter(o=>!o.reference);
+ const kids=[Number(input.c)?Number(input.c)+' 位喵寶小朋友':'',Number(input.d)?Number(input.d)+' 位犬寶小朋友':''].filter(Boolean).join('、');
+ const lines=['爸爸／媽媽您好呀～ 🐾','目前依家中 '+kids+' 的照護需求及現行價目表，幫您整理這次的初步報價唷！','','照護日期：'+result.dateLabel,'共 '+trips+' 趟到府照護。'];
+ for(const [i,o] of visible.entries()){
+  lines.push('',(visible.length>1?['① ','② '][i]||'':'')+o.title+'｜'+o.min+' 分鐘','照護內容：'+o.detail);
+  if(o.unit!==null){
+   lines.push('一般費用：'+money(o.unit)+' × '+trips+' 趟 = '+money(o.normalTotal));
+   for(const h of result.holidays)lines.push(h.name+'（'+h.spans.map(short).join('、')+'）：'+h.n+' 趟 × '+money(h.fee)+' = '+money(h.total)+(result.excluded?'（本次免收）':''));
+   if(!result.holidays.length)lines.push('這段日期依目前價目表無特殊檔期加成。');
+   lines.push('本次預估合計：'+money(o.total));
+  }
+ }
+ if(visible.length){
+  if(result.travelKnown)lines.push('','以上費用已包含車程費用'+(result.holidayTotal?'與上述特殊檔期加成':result.excluded?'，本次不另收上述檔期加成':'')+'囉！');
+  else{lines.push('','目前已依您提供的日期核算出勤趟數'+(result.holidays.length?'及適用的特殊檔期':'')+'，'+(String(input.km??'').trim()?'這個距離需另行評估':'再麻煩您提供服務地址或所在區域')+'，待車程費用確認後，就能提供完整金額唷！');}
+ }else lines.push('','此需求需先個別確認，暫不提供標準總額。');
+ if(result.warnings.length)lines.push('',...result.warnings);
+ lines.push('','以上為依目前日期及現行費率的初步報價，實際照護細節、時間及是否能承接，會在確認需求與免費家訪後再一起定案唷！🤍');
+ result.message=lines.join('\n');
+ return result;
+}
