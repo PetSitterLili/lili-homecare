@@ -9,7 +9,8 @@ export function mixedService(service) {
 }
 export function days(a,b){return Math.max(0,Math.round((Date.parse(b)-Date.parse(a))/86400000)+1)}
 export function travel(k){return !Number.isFinite(k)||k<0||k>30?null:k<=5?0:k<=7?50:k<=10?100:k<=15?250:k<=20?450:k<=25?700:1000}
-export function rate(c,d,s,r){if(d>2||c+d===0)return null;if(c&&d){if(c>5||!mixedService(s))return null;const x=r.mixed[c-1];return {fee:x[(d-1)*2],min:x[(d-1)*2+1]};}if(d){const x=r.dog[d-1];if(!["生活照顧","照顧＋散步"].includes(s))return null;const i=s==="照顧＋散步"?2:0;return {fee:x[i],min:x[i+1]};}if(!["生活照顧","陪伴專案"].includes(s))return null;const x=r.cat.find(x=>c<=x[0]);if(!x)return null;const i=s==="陪伴專案"?3:1;return {fee:x[i],min:x[i+1]};}
+export function rate(c,d,s,r){if(!Number.isSafeInteger(c)||!Number.isSafeInteger(d)||c<0||d<0||d>2||c+d===0||(!d&&c>=7))return null;if(c&&d){if(c>5||!mixedService(s))return null;const x=r.mixed[c-1];return {fee:x[(d-1)*2],min:x[(d-1)*2+1]};}if(d){const x=r.dog[d-1];if(!["生活照顧","照顧＋散步"].includes(s))return null;const i=s==="照顧＋散步"?2:0;return {fee:x[i],min:x[i+1]};}if(!["生活照顧","陪伴專案"].includes(s))return null;const x=r.cat.find(x=>c<=x[0]);if(!x)return null;const i=s==="陪伴專案"?3:1;return {fee:x[i],min:x[i+1]};}
+export function rateBasis(c,d){return c&&d?'犬喵同住現行價目｜'+(c<=2?'1～2':c)+' 喵、'+d+' 犬':d?'犬寶常態價目｜'+d+' 犬':'貓咪常態價目｜'+(c<=2?'1～2':'3～6')+' 喵';}
 export function holidayRows(rs,r){const out=[];for(const h of r.holiday){if(!h.active)continue;let n=0;const spans=[];for(const s of rs){const a=s.a>h.a?s.a:h.a,b=s.b<h.b?s.b:h.b;if(a<=b){n+=days(a,b)*s.visits.length;spans.push(a===b?a:a+'～'+b);}}if(n)out.push({...h,spans,n,total:n*h.fee});}return out}
 
 export function readRates(s){const r=JSON.parse(s);for(const k of ['cat','dog','mixed'])if(!Array.isArray(r[k])||r[k].length!==defaultRates[k].length||r[k].some((x,i)=>!Array.isArray(x)||x.length!==defaultRates[k][i].length||x.some(n=>!Number.isSafeInteger(n)||n<=0)))throw Error('費率格式錯誤');if(r.cat.some((x,i)=>x[0]!==defaultRates.cat[i][0]))throw Error('純貓級距不可變更');if(!Array.isArray(r.holiday)||r.holiday.some(h=>typeof h.name!=='string'||!h.name.trim()||typeof h.active!=='boolean'||!(/^\d{4}-\d{2}-\d{2}$/).test(h.a)||!(/^\d{4}-\d{2}-\d{2}$/).test(h.b)||h.a>h.b||!Number.isSafeInteger(h.fee)||h.fee<0))throw Error('檔期格式錯誤');const a=r.holiday.filter(h=>h.active);if(a.some((h,i)=>a.some((x,j)=>j>i&&h.a<=x.b&&x.a<=h.b)))throw Error('啟用檔期不可重疊');return r;}
@@ -44,7 +45,7 @@ export function inquiryQuote(input,r=defaultRates){
   add('生活照顧',catPlanNames['生活照顧'],base);
   add('陪伴專案',catPlanNames['陪伴專案'],'包含完整的生活照顧內容，並增加陪伴與互動時間，依毛寶的意願安排陪玩、摸摸、梳毛及眼鼻分泌物清潔等。簡易點藥及其他個別健康照護依事先約定確認，相關加購費用另行確認。');
  }
- if(!result.options.length)result.warnings.push(d>=3?'目前三位犬寶（含）以上的家庭暫不承接，謝謝您的理解。':'此家庭規模須個別評估承接與報價。');
+ if(!result.options.length)result.warnings.push(d>=3?'目前三位犬寶（含）以上的家庭暫不承接，謝謝您的理解。':!d&&c>=7?'七位喵寶以上屬多貓客製方案，需先了解實際照護工作量、動線與所需時間，再個別提供報價唷。':'此家庭規模須個別評估承接與報價。');
  if(med==='yes')result.warnings.push('有醫囑／餵藥需求，請提供對象、藥品、份量、頻率及操作方式，確認能否承接及是否需調整時間與報價。');
  if(med==='unknown')result.warnings.push('如有餵藥或特殊健康照護需求，請事先告知。');
  if(kmRaw&&tv===null)result.warnings.push('單程 30.1 公里以上，車程費用另行評估。');

@@ -5,7 +5,7 @@ import {fresh,serviceName,bookingLines} from '../docs/workspace-model.mjs';
 const names=(c)=>inquiryQuote({c,d:0,km:'0',med:'no'}).options.map(x=>x.title);
 for(const c of [1,2,3,6,7,20])assert.deepEqual(names(c),['生活照顧方案','陪伴專案']);
 assert.deepEqual(inquiryQuote({c:3,d:0,km:'0',med:'no'}).options.map(x=>[x.min,x.fee]),[[45,600],[60,950]]);
-assert.deepEqual(inquiryQuote({c:7,d:0,km:'0',med:'no'}).options.map(x=>[x.min,x.fee]),[[60,800],[90,1400]]);
+assert.deepEqual(inquiryQuote({c:7,d:0,km:'0',med:'no'}).options,[]);
 const f=fresh();f.groups.cat.pets.push({name:'test'});
 assert.equal(serviceName('生活照顧',f.groups),'生活照顧方案');
 assert.equal(serviceName('陪伴專案',f.groups),'陪伴專案');
