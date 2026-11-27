@@ -1,8 +1,8 @@
 // Keep only the public application shell offline. Family data lives in IndexedDB.
-const cacheName = 'lili-homecare-shell-2.0.1126.60';
+const cacheName = 'lili-homecare-shell-2.0.1126.61';
 const scope = self.registration.scope;
-const build = '?v=2.0.1126.60';
-const paths = ['assets/lili-serif.woff2','manifest.webmanifest?v=2.0.1126.60','assets/crm-black-cat.svg','config.js',
+const build = '?v=2.0.1126.61';
+const paths = ['assets/lili-serif.woff2','manifest.webmanifest?v=2.0.1126.61','assets/crm-black-cat.svg','config.js',
   ...['workspace.css','workspace.mjs','workspace-model.mjs','model.mjs','brand.mjs','tab-grant.mjs','drive.mjs','drafts.mjs','plan-pdf.mjs','quote.mjs','care-patch.mjs'].map(p => p+build),
   ...['cat','ig','line','icon-192','icon-512'].map(name => 'assets/'+name+'.png')];
 const urls = new Set(paths.map(path => new URL(path,scope).href));

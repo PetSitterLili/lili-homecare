@@ -260,3 +260,12 @@ dialog.family-filter-dialog[open]{display:flex;flex-direction:column}
 #families .pending-bookmark{position:absolute;top:0;right:40px;width:13px;height:23px;background:linear-gradient(105deg,#81502d 0%,#b57b42 27%,#e4bc79 47%,#c59858 64%,#8e572f 100%);clip-path:polygon(0 0,100% 0,100% 100%,50% 76%,0 100%);filter:drop-shadow(1px 2px 1px #78502d55);border-radius:1px 1px 0 0;pointer-events:none}
 #families .family-card-open[data-pending-action=true] .family-name-line{padding-right:15px}
 @media(max-width:480px){.crm-modal .crm-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.crm-modal .crm-fields>label:has(.label-qualifier){grid-column:auto}.crm-modal .crm-fields>label{font-size:11.5px}}
+
+.input-label-text{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:4px}
+.crm-modal .crm-fields>label.wide-field-label{grid-column:1/-1}
+.crm-modal .crm-fields>label:has(.input-label-text){overflow:visible}
+.quote-studio-toggle{min-height:32px;min-width:48px;font-size:12px;padding:4px 8px;margin-left:auto;color:#786b86}
+.custom-quote-studio{border-top:1px solid var(--line);padding-top:12px;margin:12px 0;min-width:0}
+.custom-quote-studio>select,.custom-quote-studio>button{margin-bottom:8px}
+.custom-quote-studio .crm-result{margin:10px 0}
+.custom-quote-studio[hidden],.quick-options[hidden],.quick-output[hidden]{display:none!important}

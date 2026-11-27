@@ -1,13 +1,13 @@
-import {inspectCarePatch,applyCarePatch,prepareFoodRefinement} from './care-patch.mjs?v=2.0.1126.60';
-import {rememberGrant,recallGrant,forgetGrant} from './tab-grant.mjs?v=2.0.1126.60';
-import {displayQuoteLabel,legacyQuoteReference,oldBookingText,hasCurrentBooking,inquiryQuote,quickPeriodQuote,mixedPlan,mixedCare,mixedService,defaultRates,readRates,days,travel,rate,rateBasis,holidayRows,quoteKey,savedQuote,quoteLines,money,overtimeText} from './quote.mjs?v=2.0.1126.60';
-import {brandDefaults,readBrand} from './brand.mjs?v=2.0.1126.60';
+import {inspectCarePatch,applyCarePatch,prepareFoodRefinement} from './care-patch.mjs?v=2.0.1126.61';
+import {rememberGrant,recallGrant,forgetGrant} from './tab-grant.mjs?v=2.0.1126.61';
+import {displayQuoteLabel,legacyQuoteReference,oldBookingText,hasCurrentBooking,inquiryQuote,quickPeriodQuote,mixedPlan,mixedCare,mixedService,defaultRates,readRates,days,travel,rate,rateBasis,holidayRows,quoteKey,savedQuote,quoteLines,money,overtimeText} from './quote.mjs?v=2.0.1126.61';
+import {brandDefaults,readBrand} from './brand.mjs?v=2.0.1126.61';
 
-import {dedupeLegacySupplies,withoutLegacyLabel,tidyLegacySupplies,clearCareFlags,relocateLegacyHospital,validReservation,reservationPeriods,readLineReservations,reservationLines,reservationSegments,inspectLineReservations,applyLineReservations,sortFamilyDirectory,validServiceDate,taipeiDate,nextBookingDate,bookingPriority,orderUpcomingFamilies,recentFamilyIds,profileStages,safeProfileUrl,readProfile,familyArea,profileAge,matchesProfile,prepareProfilePatch,applyProfilePatch,bookingDateGroups,replaceBookingDates,bookingDateLabel,lineHistory,prepareLineHistory,applyLineHistory,syncOverview,matchesFamily,prepareLegacyBatch,noteSpecs,noteRows,writeNoteRows,noteCycle,noteActive,bindPendingNotes,activeFamily,bookingSegments,bookingLines,serviceName,fresh,blanks,fields,titles,day,filename,mediaLabel,warnings,publicBlocks,tasks,sourceKey,normalize,migrate} from './workspace-model.mjs?v=2.0.1126.60';
-import {makeText as legacyText} from './model.mjs?v=2.0.1126.60';
-import {DriveStore,digest} from './drive.mjs?v=2.0.1126.60';
-import {openDB,storeDB} from './drafts.mjs?v=2.0.1126.60';
-import {buildPDF,auditLegacyCoverage} from './plan-pdf.mjs?v=2.0.1126.60';
+import {dedupeLegacySupplies,withoutLegacyLabel,tidyLegacySupplies,clearCareFlags,relocateLegacyHospital,validReservation,reservationPeriods,readLineReservations,reservationLines,reservationSegments,inspectLineReservations,applyLineReservations,sortFamilyDirectory,validServiceDate,taipeiDate,nextBookingDate,bookingPriority,orderUpcomingFamilies,recentFamilyIds,profileStages,safeProfileUrl,readProfile,familyArea,profileAge,matchesProfile,prepareProfilePatch,applyProfilePatch,bookingDateGroups,replaceBookingDates,bookingDateLabel,lineHistory,prepareLineHistory,applyLineHistory,syncOverview,matchesFamily,prepareLegacyBatch,noteSpecs,noteRows,writeNoteRows,noteCycle,noteActive,bindPendingNotes,activeFamily,bookingSegments,bookingLines,serviceName,fresh,blanks,fields,titles,day,filename,mediaLabel,warnings,publicBlocks,tasks,sourceKey,normalize,migrate} from './workspace-model.mjs?v=2.0.1126.61';
+import {makeText as legacyText} from './model.mjs?v=2.0.1126.61';
+import {DriveStore,digest} from './drive.mjs?v=2.0.1126.61';
+import {openDB,storeDB} from './drafts.mjs?v=2.0.1126.61';
+import {buildPDF,auditLegacyCoverage} from './plan-pdf.mjs?v=2.0.1126.61';
 const $=id=>document.getElementById(id),drive=new DriveStore(),db=storeDB(await openDB().catch(error=>{$('main').innerHTML='<div class="panel"><h1>目前無法啟用草稿保存</h1><p>此瀏覽器未能開啟本機資料庫，請換外部瀏覽器或檢查儲存空間；尚未開放填寫，避免資料遺失。</p></div>';throw error;}));
 let records=await db.all(),entry=null,view='service',kind='cat',petIndex=0,undo=[],syncTimer,localChain=Promise.resolve(),syncBusy=false,photoBusy=false,pdf=null,photoUrl=null,localFailure=false;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -890,7 +890,7 @@ function bookingEditor(b,groups,imported=null){
  if(draft){draw();modal.showModal();}else summary();return outer;
 }
 
-function labelText(e,t){const m=String(t).match(/^(.*?)([（(][^（）()]+[）)])$/s);if(m&&m[1].trim())e.append(document.createTextNode(m[1]),crmEl('small',m[2],'label-qualifier'));else e.append(document.createTextNode(t));return e;}
+function labelText(e,t){const m=String(t).match(/^(.*?)([（(][^（）()]+[）)])$/s),target=e.tagName==='LABEL'&&!e.childNodes.length?crmEl('span','','input-label-text'):e;if(m&&m[1].trim())target.append(document.createTextNode(m[1]),crmEl('small',m[2],'label-qualifier'));else target.append(document.createTextNode(t));if(target!==e){e.title=String(t);if([...String(t)].length>14)e.classList.add('wide-field-label');e.append(target);}return e;}
 function crmEl(tag,t='',cl=''){const e=document.createElement(tag);e.textContent=t;e.className=cl;return e;}
 function dialogCloseHeader(d,title,cancel){
  const header=crmEl('div','','dialog-close-header');
@@ -933,6 +933,7 @@ function crmCheck(parent,label,value){const l=crmEl('label');const i=crmEl('inpu
 
 function quickInquiry(f=null){
  const body=crmEl('div','','quick-inquiry'),dlg=crmDialog('快速詢價・LINE 回覆',body);
+ const studio=crmEl('div','','custom-quote-studio'),studioToggle=button('進階',()=>{studio.hidden=!studio.hidden;studioToggle.setAttribute('aria-expanded',String(!studio.hidden));studioToggle.textContent=studio.hidden?'進階':'返回快速';draw();},'quote-studio-toggle');studio.hidden=true;studioToggle.setAttribute('aria-expanded','false');dlg.querySelector('.dialog-close-header').insertBefore(studioToggle,dlg.querySelector('.dialog-close-x'));
  body.append(crmEl('p',f?(f.name||'未命名家庭')+'｜依現行費率試算，不改動家庭、舊預約或正式報價。':'不用建立家庭、預約或連接 Drive；只試算，不保存客戶資料。','muted'));
  const form=crmEl('div','','crm-fields');body.append(form);
  const count=(label)=>{const block=crmEl('div','','quick-count'),head=crmEl('label',label),row=crmEl('div','','quick-stepper'),i=crmEl('input');i.type='number';i.min='0';i.step='1';i.value='0';i.setAttribute('aria-label',label);
@@ -941,7 +942,7 @@ function quickInquiry(f=null){
  const choose=(parent,label,options,initial)=>{const l=labelText(crmEl('label'),label),s=crmEl('select');s.setAttribute('aria-label',label);for(const [v,t] of options){const o=crmEl('option',t);o.value=v;s.append(o);}s.value=initial;l.append(s);parent.append(l);return s;};
  const med=choose(form,'是否需要餵藥／特殊醫囑',[['unknown','尚未確認'],['no','沒有'],['yes','有，需確認細節']],'unknown');
  const walk=choose(form,'犬寶散步需求',[['unknown','尚未確認'],['no','不需要'],['yes','一般散步'],['long','較長時間散步']],'unknown');
- const km=crmInput(form,'單程機車導航公里（選填）',f?(readProfile(f.profile).km||savedQuote(f)?.km||''):'','number','0.1');km.min='0';km.placeholder='未知可留空';
+ const km=crmInput(form,'單程機車公里（選填）',f?(readProfile(f.profile).km||savedQuote(f)?.km||''):'','number','0.1');km.min='0';km.placeholder='未知可留空';
  const periodBox=crmEl('div','','booking-visit quick-period-box'),periodList=crmEl('div','','quick-period-list'),periodSummary=crmEl('p','','muted');
  body.append(periodBox);periodBox.append(heading('照護日期（選填）'),crmEl('p','不填日期即可試算常態單趟費用；不同日期的每日趟數可分段設定。','muted'),periodList);
  const periods=[];
@@ -998,7 +999,8 @@ function quickInquiry(f=null){
  addPeriod();periodBox.append(button('＋ 新增日期區間',()=>{const empty=periods.find(p=>!p.a);if(empty)showCalendar(empty);else addPeriod(true);draw();}),periodSummary);
  const advanced=section('檔期優惠（選填）',false),exclude=crmCheck(advanced.body,'本次免收特殊檔期加成',false);advanced.body.append(crmEl('p','只影響這次試算，不修改價目表或家庭專屬價。','muted'));periodBox.append(advanced.e);
  body.append(crmEl('p','車程費用可等地址確認後再算；餵藥不自動加價，需依照護內容評估。','muted'));
- const cards=crmEl('div','','quick-options');body.append(cards);
+ const cards=crmEl('div','','quick-options');body.append(cards,studio);
+ const studioBox=buildCustomStudio(studio,()=>({c:cats.value,d:dogs.value,km:km.value}));
  let legacyMinutes=null,legacyService=null,legacyOut=null;
  if(f){
   const prev=bookingSegments(f.booking),source=oldBookingText(f);
@@ -1024,7 +1026,7 @@ function quickInquiry(f=null){
   const q=quickPeriodQuote({c:cats.value===''?NaN:cats.value,d:dogs.value===''?NaN:dogs.value,med:med.value,walk:walk.value,km:km.value,periods:periods.map(p=>({a:p.a,b:p.b,n:p.n})),excludeHoliday:exclude.checked},currentRates());
   periodSummary.textContent=q.error?'請確認日期、毛寶數量及車程欄位。':q.trips?'共 '+q.trips+' 趟｜'+q.dateLabel:'尚未指定日期・常態單趟報價';
   advanced.e.hidden=!q.trips;
-  cards.replaceChildren();
+  cards.replaceChildren();cards.hidden=!studio.hidden;studioBox.update(q);
   if(q.error){cards.append(crmEl('p',q.error,'issue'));if(legacyOut)legacyOut.textContent=q.error;preview.value='';output.hidden=true;copy.disabled=true;return;}
   if(!q.options.length&&Number(cats.value)>=7&&Number(dogs.value)===0)cards.append(crmEl('p','七喵以上需個別報價。原多貓價目只供內部參考，不自動承諾分鐘或金額。','issue'));
   for(const o of q.options){
@@ -1045,9 +1047,42 @@ function quickInquiry(f=null){
   if(q.travelKnown)cards.append(crmEl('p','每趟車程費用 '+money(q.travel),'muted'));
   for(const msg of q.warnings)cards.append(crmEl('p',msg,'issue'));
   cards.append(crmEl('p',q.trips?'已依所選日期與現行檔期規則試算；不代表已成立預約。':'常態檔期參考；特殊檔期及正式預約仍須另行確認。','muted'));
-  if(legacyOut){const a=legacyQuoteReference(Number(cats.value),Number(dogs.value),legacyService.value,legacyMinutes.value,currentRates());if(a){const total=q.travelKnown?a.estimate+q.travel:null;legacyOut.textContent=['時間最接近的現行方案：'+a.nearest.title+'｜'+a.nearest.min+' 分鐘／'+money(a.nearest.fee+(q.travelKnown?q.travel:0))+(q.travelKnown?'（含車程費用）':'（照護費參考）'),'依原規格試算：以 '+a.basis.title+' '+a.basis.min+' 分鐘的費率為基準',legacyMinutes.value+' 分鐘 ÷ 60 × '+money(a.hourly)+'／小時（時薪顯示四捨五入）','比例試算照護費 '+money(a.estimate)+(total!==null?'；含車程費用 '+money(total)+'／趟':''),'非正式報價，須由保姆確認最低服務時間、照護內容與承接意願。'].join('\n');}else legacyOut.textContent=legacyMinutes.value?'此規格需個別評估，無可用的標準比例參考。':'輸入分鐘數，即可比較最接近的現行方案。';}preview.value=q.message;output.hidden=false;copy.disabled=false;
+  if(legacyOut){const a=legacyQuoteReference(Number(cats.value),Number(dogs.value),legacyService.value,legacyMinutes.value,currentRates());if(a){const total=q.travelKnown?a.estimate+q.travel:null;legacyOut.textContent=['時間最接近的現行方案：'+a.nearest.title+'｜'+a.nearest.min+' 分鐘／'+money(a.nearest.fee+(q.travelKnown?q.travel:0))+(q.travelKnown?'（含車程費用）':'（照護費參考）'),'依原規格試算：以 '+a.basis.title+' '+a.basis.min+' 分鐘的費率為基準',legacyMinutes.value+' 分鐘 ÷ 60 × '+money(a.hourly)+'／小時（時薪顯示四捨五入）','比例試算照護費 '+money(a.estimate)+(total!==null?'；含車程費用 '+money(total)+'／趟':''),'非正式報價，須由保姆確認最低服務時間、照護內容與承接意願。'].join('\n');}else legacyOut.textContent=legacyMinutes.value?'此規格需個別評估，無可用的標準比例參考。':'輸入分鐘數，即可比較最接近的現行方案。';}preview.value=q.message;output.hidden=!studio.hidden;copy.disabled=false;
  }
  body.addEventListener('input',draw);body.addEventListener('change',draw);draw();dlg.showModal();
+}
+
+// Internal scenario calculator. No client information or private rates are embedded in the public app.
+function buildCustomStudio(root,conditions){
+ const key='lili-internal-quote-anchors-v1';let anchors=[];try{const a=JSON.parse(localStorage.getItem(key)||'[]');if(Array.isArray(a))anchors=a.filter(x=>x&&typeof x.name==='string');}catch{}
+ const state=crmEl('p','','muted'),basis=crmEl('select'),applyBasis=button('帶入參考工時／費率',()=>{const i=refs.find(x=>x.id===basis.value);if(!i)return;if(i.min!==null)base.value=String(i.min);if(i.hourly!==null){baseRate.value=String(i.hourly);suggestRate.value=String(i.hourly);wishRate.value=String(i.hourly);}render();});
+ const source=crmEl('p','選擇依據後可帶入；沒有可靠錨點時，請依任務自行估工時與時薪。','muted');
+ root.append(heading('進階報價工作室'),state,source,basis,applyBasis);
+ const work=section('照護工時與額外負荷',true),g=crmEl('div','','crm-fields');work.body.append(g);
+ const base=crmInput(g,'基礎照護分鐘',''),floor=crmInput(g,'樓層額外分鐘','0'),clean=crmInput(g,'清潔額外分鐘','0'),extra=crmInput(g,'其他任務分鐘','0'),recovery=crmInput(g,'案後整理分鐘','0');for(const i of [base,floor,clean,extra,recovery])i.min='0';
+ const loads=section('主觀難度與承接意願',true),lg=crmEl('div','','crm-fields');loads.body.append(lg);
+ const stars=crmInput(lg,'主觀負荷 0～5 星','0');stars.min='0';stars.max='5';
+ const willingness=crmEl('select');for(const [v,t] of [['unknown','尚待評估'],['yes','願意承接'],['price','報酬合理即可'],['conditional','須先調整合作條件'],['no','目前不考慮承接']]){const o=crmEl('option',t);o.value=v;willingness.append(o);}loads.body.append(willingness,crmEl('p','星級只記錄負荷，不擅自換算成未確認的加價。','muted'));
+ const rates=section('內部勞務時薪與交通',true),rg=crmEl('div','','crm-fields');rates.body.append(rg);
+ const baseRate=crmInput(rg,'基礎時薪',''),suggestRate=crmInput(rg,'建議時薪',''),wishRate=crmInput(rg,'意願時薪',''),travelInput=crmInput(rg,'車程費用（選填）',''),premium=crmInput(rg,'獨立額外費用','0');for(const i of [baseRate,suggestRate,wishRate,travelInput,premium])i.min='0';
+ const result=crmEl('div','','crm-result'),anchorSection=section('定價錨點庫（本機）',false),ag=crmEl('div','','crm-fields');anchorSection.body.append(crmEl('p','僅存此瀏覽器，不會寫進公開網站、Google Drive 或家庭檔案。建議使用匿名代稱。','muted'),ag);
+ const name=crmInput(ag,'錨點名稱','','text'),memo=crmEl('textarea');memo.placeholder='任務、執行人數、歷史報酬、實際工時、再次承接意願等';anchorSection.body.append(memo);
+ const saved=crmEl('div'),persist=()=>{try{localStorage.setItem(key,JSON.stringify(anchors));return true;}catch{toast('本機儲存失敗，錨點未保存');return false;}};
+ const positive=i=>i.value.trim()!==''&&Number.isFinite(Number(i.value))&&Number(i.value)>0?Number(i.value):null;
+ const nonnegative=i=>i.value.trim()!==''&&Number.isFinite(Number(i.value))&&Number(i.value)>=0?Number(i.value):null;
+ let refs=[],lastQ=null,lastRefKey='';
+ const save=button('將目前試算收為錨點',()=>{const n=name.value.trim(),m=positive(base),r=positive(suggestRate);if(!n||m===null||r===null)return toast('請先輸入名稱、基礎工時及建議時薪');const total=[base,floor,clean,extra,recovery].reduce((a,i)=>a+(nonnegative(i)||0),0);const record={id:crypto.randomUUID(),name:n,min:total,hourly:r,memo:memo.value,stars:nonnegative(stars),willingness:willingness.value};anchors.push(record);if(!persist()){anchors.pop();return;}name.value='';memo.value='';refreshRefs();drawAnchors();toast('已保存本機錨點');});
+ anchorSection.body.append(save,saved);
+ function drawAnchors(){saved.replaceChildren();if(!anchors.length)saved.append(crmEl('p','目前沒有本機錨點，可先用任務拆解試算。','muted'));for(const a of anchors){const row=crmEl('div','','booking-visit');row.append(crmEl('strong',a.name),crmEl('p',a.min+' 分鐘｜'+money(a.hourly)+'／小時'),crmEl('p',a.memo||'無補充','muted'),button('刪除錨點',async()=>{if(!await confirmAction('刪除錨點？','只刪除此瀏覽器內的參考資料。','刪除'))return;const old=anchors;anchors=anchors.filter(x=>x.id!==a.id);if(!persist()){anchors=old;return;}refreshRefs();drawAnchors();},'clear'));saved.append(row);}}
+ function refreshRefs(){const old=basis.value,standard=(lastQ?.options||[]).filter(o=>Number.isFinite(o.fee)&&o.min>0).map((o,i)=>({id:'standard-'+i,name:'現行價目參考｜'+o.title,min:o.min,hourly:Math.round(o.fee*60/o.min)}));refs=[{id:'manual',name:'無相似錨點・依任務試算',min:null,hourly:null},...standard,...anchors];basis.replaceChildren();for(const a of refs){const o=crmEl('option',a.name);o.value=a.id;basis.append(o);}if(refs.some(x=>x.id===old))basis.value=old;applyBasis.disabled=basis.value==='manual';}
+ basis.onchange=()=>{applyBasis.disabled=basis.value==='manual';};
+ function render(){const c=conditions(),blocked=Number(c.d)>=3;state.textContent='沿用快速詢價條件：'+(c.c||'0')+' 喵／'+(c.d||'0')+' 犬'+(c.km!==''?'｜'+c.km+' 公里':'')+(blocked?'｜超出現行承接範圍，僅內部試算':'');
+ const minutes=[base,floor,clean,extra,recovery].map(nonnegative),valid=minutes.every(n=>n!==null)&&minutes.reduce((a,b)=>a+b,0)>0&&positive(base)!==null;
+ const total=minutes.reduce((a,b)=>a+(b||0),0),tr=nonnegative(travelInput)??(c.km!==''?travel(Number(c.km)):null),x=nonnegative(premium);
+ const lines=['預估總工時：'+(valid?total+' 分鐘':'待確認')];for(const [label,i] of [['基礎價',baseRate],['建議價',suggestRate],['意願價',wishRate]]){const r=positive(i);if(!valid||r===null||x===null){lines.push(label+'：待輸入');continue;}const amount=Math.round(total*r/60+x+(tr??0));lines.push(label+'：'+money(amount)+'／趟'+(tr===null?'（未含車程）':''));if(lastQ?.trips&&!lastQ.error&&tr!==null)lines.push('　檔期及趟數合計：'+money(amount*lastQ.trips+lastQ.holidayTotal));}
+ if(blocked||willingness.value==='no'||willingness.value==='conditional')lines.push('承接條件未符合，僅保留內部試算。');lines.push('不自動生成或覆蓋正式報價。');result.textContent=lines.join('\n');}
+ root.append(work.e,loads.e,rates.e,result,anchorSection.e);root.addEventListener('input',render);root.addEventListener('change',render);drawAnchors();refreshRefs();
+ return {update(q){lastQ=q;const newKey=JSON.stringify((q?.options||[]).map(o=>[o.title,o.fee,o.min]));if(newKey!==lastRefKey){lastRefKey=newKey;refreshRefs();}render();}};
 }
 
 function currentRates(){try{return readRates(brand.rates);}catch{return structuredClone(defaultRates);}}
@@ -1121,7 +1156,7 @@ function quoteDialog(f){
   const output=[];
   for(const x of rows){
    const std=standardFee(x),sp=validFee(special[x.k]),manual=mode.value==='manual',chosen=manual?(x.override.value.trim()===''?undefined:Number(x.override.value)):mode.value==='special'&&sp?Number(special[x.k]):std;
-   x.override.parentElement.hidden=!manual;
+   x.override.closest('label').hidden=!manual;
    x.fix.hidden=manual||validFee(chosen);x.priceText.textContent=manual?(x.std?'現行標準參考 '+money(x.std.fee)+'／'+x.std.min+' 分鐘':'需個別報價'):chosen===undefined?(x.std?'預約 '+x.min+' 分鐘；標準為 '+x.std.min+' 分鐘／'+money(x.std.fee)+'。請改用標準時間或自行定價。':'此家庭或方案無自動標準費率，請自行定價。'):(mode.value==='special'&&sp?'家庭專屬價 ':'標準照護費 ')+money(chosen)+'／趟';
    x.sub.textContent=validTravel&&validFee(chosen)?'含車程費用小計 '+money((chosen+tv)*x.n):'';
    if(!validFee(chosen)){missing ||= x.label;continue;}
