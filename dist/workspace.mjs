@@ -1,13 +1,13 @@
-import {inspectCarePatch,applyCarePatch} from './care-patch.mjs?v=2.0.1126.51';
-import {rememberGrant,recallGrant,forgetGrant} from './tab-grant.mjs?v=2.0.1126.51';
-import {displayQuoteLabel,legacyQuoteReference,oldBookingText,hasCurrentBooking,inquiryQuote,mixedPlan,mixedCare,mixedService,defaultRates,readRates,days,travel,rate,holidayRows,quoteKey,savedQuote,quoteLines,money,overtimeText} from './quote.mjs?v=2.0.1126.51';
-import {brandDefaults,readBrand} from './brand.mjs?v=2.0.1126.51';
+import {inspectCarePatch,applyCarePatch} from './care-patch.mjs?v=2.0.1126.52';
+import {rememberGrant,recallGrant,forgetGrant} from './tab-grant.mjs?v=2.0.1126.52';
+import {displayQuoteLabel,legacyQuoteReference,oldBookingText,hasCurrentBooking,inquiryQuote,mixedPlan,mixedCare,mixedService,defaultRates,readRates,days,travel,rate,holidayRows,quoteKey,savedQuote,quoteLines,money,overtimeText} from './quote.mjs?v=2.0.1126.52';
+import {brandDefaults,readBrand} from './brand.mjs?v=2.0.1126.52';
 
-import {withoutLegacyLabel,tidyLegacySupplies,clearCareFlags,relocateLegacyHospital,validReservation,reservationPeriods,readLineReservations,reservationLines,reservationSegments,inspectLineReservations,applyLineReservations,sortFamilyDirectory,validServiceDate,taipeiDate,nextBookingDate,orderUpcomingFamilies,recentFamilyIds,profileStages,safeProfileUrl,readProfile,familyArea,profileAge,matchesProfile,prepareProfilePatch,applyProfilePatch,bookingDateGroups,replaceBookingDates,bookingDateLabel,lineHistory,prepareLineHistory,applyLineHistory,syncOverview,matchesFamily,prepareLegacyBatch,noteSpecs,noteRows,writeNoteRows,noteCycle,noteActive,bindPendingNotes,activeFamily,bookingSegments,bookingLines,serviceName,fresh,blanks,fields,titles,day,filename,mediaLabel,warnings,publicBlocks,tasks,sourceKey,normalize,migrate} from './workspace-model.mjs?v=2.0.1126.51';
-import {makeText as legacyText} from './model.mjs?v=2.0.1126.51';
-import {DriveStore,digest} from './drive.mjs?v=2.0.1126.51';
-import {openDB,storeDB} from './drafts.mjs?v=2.0.1126.51';
-import {buildPDF,auditLegacyCoverage} from './plan-pdf.mjs?v=2.0.1126.51';
+import {dedupeLegacySupplies,withoutLegacyLabel,tidyLegacySupplies,clearCareFlags,relocateLegacyHospital,validReservation,reservationPeriods,readLineReservations,reservationLines,reservationSegments,inspectLineReservations,applyLineReservations,sortFamilyDirectory,validServiceDate,taipeiDate,nextBookingDate,orderUpcomingFamilies,recentFamilyIds,profileStages,safeProfileUrl,readProfile,familyArea,profileAge,matchesProfile,prepareProfilePatch,applyProfilePatch,bookingDateGroups,replaceBookingDates,bookingDateLabel,lineHistory,prepareLineHistory,applyLineHistory,syncOverview,matchesFamily,prepareLegacyBatch,noteSpecs,noteRows,writeNoteRows,noteCycle,noteActive,bindPendingNotes,activeFamily,bookingSegments,bookingLines,serviceName,fresh,blanks,fields,titles,day,filename,mediaLabel,warnings,publicBlocks,tasks,sourceKey,normalize,migrate} from './workspace-model.mjs?v=2.0.1126.52';
+import {makeText as legacyText} from './model.mjs?v=2.0.1126.52';
+import {DriveStore,digest} from './drive.mjs?v=2.0.1126.52';
+import {openDB,storeDB} from './drafts.mjs?v=2.0.1126.52';
+import {buildPDF,auditLegacyCoverage} from './plan-pdf.mjs?v=2.0.1126.52';
 const $=id=>document.getElementById(id),drive=new DriveStore(),db=storeDB(await openDB().catch(error=>{$('main').innerHTML='<div class="panel"><h1>目前無法啟用草稿保存</h1><p>此瀏覽器未能開啟本機資料庫，請換外部瀏覽器或檢查儲存空間；尚未開放填寫，避免資料遺失。</p></div>';throw error;}));
 let records=await db.all(),entry=null,view='service',kind='cat',petIndex=0,undo=[],syncTimer,localChain=Promise.resolve(),syncBusy=false,photoBusy=false,pdf=null,photoUrl=null,localFailure=false;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -157,7 +157,7 @@ function careNoteField(spec,label,placeholder){
    line.append(body,actions);list.append(line);paint();requestAnimationFrame(()=>{resize(input);if(focus===n.id)input.focus({preventScroll:true});});
   }
  };
- const add=button('＋ 新增備註',()=>{const n=blank();rows.push(n);draw(n.id);},'care-note-add');wrap.append(add);draw();return wrap;
+ const add=button('＋ 新增一項',()=>{const n=blank();rows.push(n);draw(n.id);},'care-note-add');wrap.append(add);draw();return wrap;
 }
 
 function check(label,checked,fn){const l=document.createElement('label');l.className='check';const i=document.createElement('input');i.type='checkbox';i.checked=checked;i.onchange=()=>fn(i.checked);l.append(i);labelText(l,label);return l;}
@@ -290,6 +290,53 @@ function careBlock(content,f,key,title,type,read,edit){
  content.append(panel);
 }
 
+
+const careEditLabels={
+ dry:{item:'飼料品項',amount:'每次給多少',unit:'單位',location:'備品放哪裡',leftover:'剩食怎麼處理',note:'日常餵食細節'},
+ wet:{item:'濕食品項',amount:'每次給多少',unit:'單位',water:'怎麼加水',location:'備品放哪裡',leftover:'剩食怎麼處理',note:'日常餵食細節'},
+ snack:{item:'零食品項',amount:'每次給多少',unit:'單位',location:'備品放哪裡',note:'給零食的方式與習慣'},
+ water:{place:'水碗／飲水機在哪裡',source:'用哪裡的水',care:'怎麼換水、補水',note:'日常飲水照護細節'},
+ wash:{sponge:'菜瓜布',spongePlace:'菜瓜布樣式與位置',soap:'洗碗精',soapPlace:'洗碗精樣式與位置',note:'平常怎麼洗碗'},
+ toilet:{place:'砂盆／尿墊在哪裡',spare:'備品放哪裡',waste:'垃圾怎麼處理',usual:'平常尿尿、便便狀況',note:'日常清潔細節'},
+ play:{likes:'喜歡怎麼互動',toys:'玩具與位置',note:'陪伴方式與注意事項'},
+ walk:{time:'散步時間與路線',tools:'散步用品放哪裡',note:'散步方式與安全',returnNote:'返家清潔用品與做法'},
+ health:{status:'目前健康狀態',note:'健康觀察與用藥方式'}
+};
+const careLabel=(type,key,label)=>careEditLabels[type]?.[key]||label;
+const careDefs=type=>fields[type].map(([key,label])=>[key,careLabel(type,key,label)]);
+function compactCareField(f,obj,key,label,options={}){
+ const el=field(obj,key,label,options);
+ const spec=noteSpecs(f).find(s=>s.obj===obj&&s.key===key),rows=spec?noteRows(spec):[];
+ const text=String(obj[key]||'');
+ if(options.short&&!/\n/.test(text)&&text.length<=32&&rows.length<=1){el.classList.add('care-edit-short','compact');}
+ else el.classList.add('care-edit-wide');
+ return el;
+}
+function renderFoodEditor(f,o,type,body){
+ body.append(check('本次提供',o.enabled!==false,yes=>{snapshot();o.enabled=yes;dirty();render();}));
+ const label=key=>careLabel(type,key,key);
+ const noteLabel=o.enabled===false?'不提供的原因／平常習慣':label('note');
+ const details=()=>{
+  const g=grid();g.classList.add('care-edit-grid');
+  const add=(key,short,placeholder='',options=null)=>g.append(compactCareField(f,o,key,label(key),{short,placeholder,options,compact:short}));
+  add('item',true,type==='dry'?'例：飼料品牌／口味':type==='wet'?'例：罐頭、餐包':'例：肉泥、凍乾');
+  add('location',true,'例：廚房高櫃');
+  add('amount',true,'例：1/2、早晚不同');
+  add('unit',true,'例：碗、匙、顆');
+  if(type==='wet')add('water',true,'例：加 50 cc');
+  if(type!=='snack')add('leftover',type==='wet','',['清掉換新','留到下一趟整理','移出洗碗後放回','沿用並補新糧','集中處理，詳見補充']);
+  if(type==='dry'){
+   g.append(check('需要混糧',!!o.mix,yes=>{snapshot();o.mix=yes;dirty();render();}));
+   if(o.mix){g.append(compactCareField(f,o,'mixItem','另一款飼料',{short:true,placeholder:'品項'}),compactCareField(f,o,'mixAmount','混糧比例',{short:true,placeholder:'例：各一半'}));}
+  }
+  return g;
+ };
+ const note=field(o,'note',noteLabel,{long:true,placeholder:o.enabled===false?'例：吃得慢，家長在家才餵':'例：餵食順序、碗放哪裡、每隻的差異'});
+ note.classList.add('care-edit-daily');
+ if(o.enabled===false){body.append(note);const retained=section('查看／修改留存的餵食資料',false);retained.body.append(details());body.append(retained.e);}
+ else body.append(details(),note);
+}
+
 function renderEdit(content){const f=entry.f;content.append(profilePanel(f));const linePlan=lineReservationPanel(f);if(linePlan)content.append(linePlan);if(f.importOriginal&&!f.importReview){const revisit=crmEl('div','','row');revisit.append(button('重新標為舊資料待複核',async()=>{if(!await confirmAction('重新標為待複核？','資料與歷史報價都會保留。','確認'))return;snapshot();f.importReview=true;delete f.importReviewedAt;dirty();render();}));content.append(revisit);}if(f.importOriginal){const archive=section('舊版家訪原始紀錄（內部）',false);const pre=document.createElement('pre');pre.className='legacy-original';pre.textContent=f.importOriginal;archive.body.append(pre);content.append(archive.e);}
 if(!f.groups[kind]){kind=Object.keys(f.groups)[0];petIndex=0;}
 
@@ -328,12 +375,12 @@ if(group.pets.length){petIndex=Math.min(petIndex,group.pets.length-1);const p=gr
 for(const type of ['health','dry','wet','snack','water','wash','play','toilet','walk']){
  if(type==='walk'&&kind!=='dog')continue;const o=group.food[type]||group[type],food=['dry','wet','snack'].includes(type);
  careBlock(content,f,kind+'-'+type,titles[type],type,body=>{
- if(food&&o.enabled===false){body.append(crmEl('p','本次不需提供'+titles[type]+'。','care-read-value'));careReadFields(f,o,[['note','留存交代（非本期指令）']],body,{inactive:true});const retained=section('查看留存品項與份量等資料',false);careReadFields(f,o,fields[type].filter(([k])=>k!=='note'),retained.body,{inactive:true});if(type==='dry'&&o.mix)careReadFields(f,o,[['mixItem','混糧品項'],['mixAmount','混糧比例']],retained.body,{inactive:true});if(retained.body.children.length)body.append(retained.e);return;}
- careReadFields(f,o,fields[type],body);if(type==='health')careReadFields(f,f,[['hospital','習慣去的動物醫院']],body);if(type==='dry'&&o.mix){body.append(crmEl('p','需要混糧','care-read-value'));careReadFields(f,o,[['mixItem','另一款飼料'],['mixAmount','兩款比例／各自份量']],body);}if(type==='walk'&&o.parts?.length)body.append(crmEl('p','返家整理：'+o.parts.join('、'),'care-read-value'));
+ if(food&&o.enabled===false){body.append(crmEl('p','本次不需提供'+titles[type]+'。','care-read-value'));careReadFields(f,o,[['note','不提供的原因／平常習慣（非本期指令）']],body,{inactive:true});const retained=section('查看留存品項與份量等資料',false);careReadFields(f,o,careDefs(type).filter(([k])=>k!=='note'),retained.body,{inactive:true});if(type==='dry'&&o.mix)careReadFields(f,o,[['mixItem','混糧品項'],['mixAmount','混糧比例']],retained.body,{inactive:true});if(retained.body.children.length)body.append(retained.e);return;}
+ careReadFields(f,o,careDefs(type),body);if(type==='health')careReadFields(f,f,[['hospital','習慣去的動物醫院']],body);if(type==='dry'&&o.mix){body.append(crmEl('p','需要混糧','care-read-value'));careReadFields(f,o,[['mixItem','另一款飼料'],['mixAmount','兩款比例／各自份量']],body);}if(type==='walk'&&o.parts?.length)body.append(crmEl('p','返家整理：'+o.parts.join('、'),'care-read-value'));
  },body=>{
- if(food){body.append(check('本次提供',o.enabled!==false,yes=>{snapshot();o.enabled=yes;dirty();render();}));if(o.enabled===false){body.append(field(o,'note','留存交代／不提供原因（不列為本期餵食指令）',{long:true}));return;}}
- const g=grid();for(const[k,l]of fields[type]){if(['amount','unit'].includes(k)){if(k==='amount')g.append(quantity(o));continue;}if(k==='waste'&&!o.waste){const details=section('特殊垃圾處理',false);details.body.append(field(o,k,'這家的特殊交代'));g.append(details.e);continue;}
- const opts=k==='leftover'?['清掉換新','留到下一趟整理','移出洗碗後放回','沿用並補新糧','集中處理，詳見補充']:type==='health'&&k==='status'?['目前無需處置','需要處置','觀察即可','待家長提供']:type==='wash'&&['sponge','soap'].includes(k)?['有，寵物專用','有，使用方式待確認','與人共用','不使用','無','無寵物專用，使用方式待確認','待家長提供']:null;g.append(field(o,k,l,{long:['note','returnNote'].includes(k),options:opts,compact:!!opts}));}body.append(g);
+ if(food){renderFoodEditor(f,o,type,body);return;}
+ const g=grid();g.classList.add('care-edit-grid');for(const[k,l]of careDefs(type)){if(['amount','unit'].includes(k)){if(k==='amount')g.append(quantity(o));continue;}if(k==='waste'&&!o.waste){const details=section('特殊垃圾處理',false);details.body.append(field(o,k,'垃圾怎麼處理'));g.append(details.e);continue;}
+ const opts=k==='leftover'?['清掉換新','留到下一趟整理','移出洗碗後放回','沿用並補新糧','集中處理，詳見補充']:type==='health'&&k==='status'?['目前無需處置','需要處置','觀察即可','待家長提供']:type==='wash'&&['sponge','soap'].includes(k)?['有，寵物專用','有，使用方式待確認','與人共用','不使用','無','無寵物專用，使用方式待確認','待家長提供']:null;g.append(compactCareField(f,o,k,l,{long:['note','returnNote'].includes(k),options:opts,short:!['note','returnNote'].includes(k),compact:!!opts,placeholder:k==='note'?'記下平常怎麼照護、個別差異或注意事項':''}));}body.append(g);
  if(type==='health')body.append(field(f,'hospital','習慣去的動物醫院',{long:true}));
  if(type==='dry'){body.append(check('需要混糧',!!o.mix,yes=>{snapshot();o.mix=yes;dirty();render();}));if(o.mix){const g=grid();g.append(field(o,'mixItem','另一款飼料'),field(o,'mixAmount','兩款比例／各自份量'));body.append(g);}}
  if(type==='walk'){body.append(heading('返家清潔檢查'));const c=crmEl('div','','checks');for(const part of ['臉／眼周','嘴巴','前腳','後腳','屁股／外陰','身體／雨天擦乾'])c.append(check(part,(o.parts||[]).includes(part),yes=>{snapshot();o.parts=yes?[...new Set([...(o.parts||[]),part])]:(o.parts||[]).filter(x=>x!==part);dirty();}));body.append(c);}
@@ -521,15 +568,15 @@ async function cleanupCareData(mode){
  importingLegacy=true;status();
  try{
   await localChain;
-  const compute=f=>{if(mode==='flags'){const r=clearCareFlags(f);return {copy:r.copy,count:r.count,review:0};}if(mode==='supplies')return tidyLegacySupplies(f);const r=relocateLegacyHospital(f);return {copy:r.copy,count:r.moved,review:r.review};};
+  const compute=f=>{if(mode==='flags'){const r=clearCareFlags(f);return {copy:r.copy,count:r.count,review:0};}if(mode==='supplies')return tidyLegacySupplies(f);if(mode==='dedupe')return dedupeLegacySupplies(f);const r=relocateLegacyHospital(f);return {copy:r.copy,count:r.moved,review:r.review};};
   const plan=records.filter(r=>mode==='flags'||!r.f.archived).map(r=>({r,f:r.f,rev:r.rev,result:compute(r.f)}));
   const count=plan.reduce((n,x)=>n+x.result.count,0),review=plan.filter(x=>x.result.review);
-  const body=crmEl('div'),dlg=crmDialog(mode==='flags'?'清除全域小卡旗標':mode==='supplies'?'整理備品位置與菜瓜布':'整理舊家訪醫院',body);
-  body.append(crmEl('p',mode==='flags'?'全部家庭目前的旗標（含已刪除家庭）都改為不加入小卡。文字、時效、待確認狀態及已產生的歷史小卡不變。':mode==='supplies'?'只補入原備註中明確的備品位置，保留原文與時效，不覆蓋已有欄位。將已記載有菜瓜布但使用方式待確認的項目改為寵物專用，共用或否定例外保留。':'只搬移原問卷「指定救援醫院」與舊其他任務完全相符的資料，保留完整原文，搬移後仍待你確認。','muted'));
+  const body=crmEl('div'),dlg=crmDialog(mode==='flags'?'清除全域小卡旗標':mode==='supplies'?'整理備品位置與菜瓜布':mode==='dedupe'?'整理重複備品位置':'整理舊家訪醫院',body);
+  body.append(crmEl('p',mode==='flags'?'全部家庭目前的旗標（含已刪除家庭）都改為不加入小卡。文字、時效、待確認狀態及已產生的歷史小卡不變。':mode==='supplies'?'只補入原備註中明確的備品位置，保留原文與時效，不覆蓋已有欄位。將已記載有菜瓜布但使用方式待確認的項目改為寵物專用，共用或否定例外保留。':mode==='dedupe'?'只有已在備品位置欄完整保留且有效期限一致的獨立重複文字才移除；保留原問卷、其他交代、旗標及歷史。':'只搬移原問卷「指定救援醫院」與舊其他任務完全相符的資料，保留完整原文，搬移後仍待你確認。','muted'));
   body.append(crmEl('strong','預計 '+plan.filter(x=>x.result.count).length+' 戶，'+count+' 項'));
-  if(review.length){const s=section('有差異，未自動修正（'+review.length+' 戶）',false);for(const x of review)s.body.append(crmEl('p',x.f.name));body.append(s.e);}
+  if(mode==='dedupe')for(const x of plan.filter(x=>x.result.count)){const s=section(x.f.name+'｜'+x.result.count+' 項',false);for(const c of x.result.changes)s.body.append(crmEl('p',(c.kind==='cat'?'喵寶':'犬寶')+'・'+titles[c.type]+'：移除重複行「'+c.removed+'」；保留備品位置「'+c.kept+'」'));body.append(s.e);}if(review.length){const s=section('有差異，未自動修正（'+review.length+' 戶）',false);for(const x of review)s.body.append(crmEl('p',x.f.name));body.append(s.e);}
   const cancel=dlg.querySelector(':scope > button:last-child');
-  const apply=button(mode==='flags'?'確認清除全部旗標':mode==='supplies'?'確認整理備品與菜瓜布':'確認搬移醫院',async()=>{
+  const apply=button(mode==='flags'?'確認清除全部旗標':mode==='supplies'?'確認整理備品與菜瓜布':mode==='dedupe'?'確認清理重複行':'確認搬移醫院',async()=>{
    if(apply.disabled)return;if(!ready()||draining||syncBusy||connecting||photoBusy||brandSyncActive)return toast('請先連線 Drive 並完成同步。');
    apply.disabled=true;cancel.disabled=true;
    try{
@@ -678,7 +725,7 @@ function editLineReservation(f,r){
 }
 
 function wireMenu(){
- $('clearCareFlags').onclick=()=>cleanupCareData('flags');$('relocateHospital').onclick=()=>cleanupCareData('hospital');$('tidySupplies').onclick=()=>cleanupCareData('supplies');
+ $('clearCareFlags').onclick=()=>cleanupCareData('flags');$('relocateHospital').onclick=()=>cleanupCareData('hospital');$('tidySupplies').onclick=()=>cleanupCareData('supplies');$('dedupeSupplies').onclick=()=>cleanupCareData('dedupe');
  $('lineBookingImport').onclick=()=>$('lineBookingFile').click();$('lineBookingFile').onchange=e=>{if(e.target.files[0])importLineBookings(e.target.files[0]);};
  $('carePatchImport').onclick=()=>$('carePatchFile').click();$('carePatchFile').onchange=e=>{if(e.target.files[0])importCareFields(e.target.files[0]);};
  const menu=$('appMenu');

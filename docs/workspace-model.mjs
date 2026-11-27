@@ -102,7 +102,7 @@ export function sourceKey(f){return JSON.stringify({cardVersion:2,contact:f.cont
 export function normalize(raw){if(raw?.schema!==2||typeof raw.id!=='string'||typeof raw.name!=='string'||!raw.groups||!Array.isArray(raw.photos)||!Array.isArray(raw.runs)||raw.photos.length>1000||raw.runs.length>1000)throw Error('家庭資料格式不正確');const f=fresh();f.id=raw.id;if(raw.archived===true)f.archived=true;f.name=raw.name;if(raw.pendingAction===true)f.pendingAction=true;if(raw.profile)f.profile=readProfile(raw.profile);const safeObj=o=>{const result={};for(const[k,v]of Object.entries(o||{})){if(['__proto__','constructor','prototype'].includes(k))continue;if(typeof v==='string'||typeof v==='boolean'||v===null||Array.isArray(v)&&v.every(x=>typeof x==='string'))result[k]=v;}return result;};f.clientRisk={status:['normal','watch','blacklist'].includes(raw.clientRisk?.status)?raw.clientRisk.status:'normal',note:typeof raw.clientRisk?.note==='string'?raw.clientRisk.note:''};f.contact=safeObj(raw.contact);f.booking=safeObj(raw.booking);f.booking.services=Array.isArray(f.booking.services)?f.booking.services:[];f.media={status:['yes','no','pending'].includes(raw.media?.status)?raw.media.status:'pending',note:typeof raw.media?.note==='string'?raw.media.note:''};for(const k of ['decisionEditedAt','legacyConsentFixedAt'])if(typeof raw.media?.[k]==='string')f.media[k]=raw.media[k];if(typeof raw.media?.careNoteRows_note==='string')f.media.careNoteRows_note=raw.media.careNoteRows_note;f.entry=safeObj(raw.entry);f.hospital=typeof raw.hospital==='string'?raw.hospital:'';f.environment=String(raw.environment||'');f.extra=String(raw.extra||'');for(const k of ['careNoteRows_hospital','careNoteRows_environment','careNoteRows_extra'])if(typeof raw[k]==='string')f[k]=raw[k];f.updatedAt=typeof raw.updatedAt==='string'?raw.updatedAt:null;f.groups={};for(const kind of ['cat','dog'])if(raw.groups[kind]){const g=blanks(),src=raw.groups[kind];for(const type of Object.keys(g)){if(type==='pets'){g.pets=(Array.isArray(src.pets)?src.pets:[]).slice(0,100).map(safeObj);}else if(type==='food'){for(const t of ['dry','wet','snack'])g.food[t]=safeObj(src.food?.[t]);}else g[type]=safeObj(src[type]);}f.groups[kind]=g;}if(!Object.keys(f.groups).length)throw Error('缺少貓狗資料');f.photos=raw.photos.map(p=>{if(typeof p.id!=='string'||typeof p.name!=='string'||typeof p.caption!=='string'||!['image/jpeg','image/png','image/webp'].includes(p.mime)||typeof p.thumb!=='string'||!/^data:image\/(jpeg|png|webp);base64,/.test(p.thumb)||!Number.isFinite(p.size)||p.size<0)throw Error('照片格式不正確');return {id:p.id,name:p.name,caption:p.caption,mime:p.mime,thumb:p.thumb,size:p.size,...(typeof p.driveId==='string'?{driveId:p.driveId}:{})};});f.runs=raw.runs.map(r=>({id:String(r.id||''),label:String(r.label||''),source:String(r.source||''),tasks:(Array.isArray(r.tasks)?r.tasks:[]).map(t=>({id:String(t.id||''),title:String(t.title||''),detail:String(t.detail||'')})),checks:safeObj(r.checks),createdAt:String(r.createdAt||'')}));if(raw.lineReservations!==undefined){if(!Array.isArray(raw.lineReservations)||raw.lineReservations.length>500||raw.lineReservations.some(r=>!validReservation(r)||!['confirmed','adopted'].includes(r.state)))throw Error('LINE預約資料格式不正確');f.lineReservations=structuredClone(raw.lineReservations);}if(Array.isArray(raw.carePatchReceipts))f.carePatchReceipts=[...new Set(raw.carePatchReceipts.filter(s=>typeof s==='string'&&/^[a-zA-Z0-9-]{1,100}$/.test(s)))];if(raw.legacy)f.legacy=raw.legacy;if(raw.importReview===true)f.importReview=true;for(const k of ['importSource','importOriginal','importReviewedAt'])if(typeof raw[k]==='string')f[k]=raw[k];return f;}
 export function migrate(old,oldText){const f=fresh();f.id=old.id;f.name=old.name;f.updatedAt=old.updatedAt;f.photos=old.photos||[];f.legacy=old;f.extra='舊版資料完整保留，請確認後逐步整理到新欄位。\n\n'+oldText;return f;}
 
-import {catPlanNames,displayQuoteLabel,mixedPlan,mixedCare,mixedService} from './quote.mjs?v=2.0.1126.51';
+import {catPlanNames,displayQuoteLabel,mixedPlan,mixedCare,mixedService} from './quote.mjs?v=2.0.1126.52';
 // Legacy service keys remain valid in stored families and visit cards.
 export function serviceName(service,groups){
  if(groups.cat&&groups.dog&&mixedService(service))return mixedPlan;
@@ -380,3 +380,37 @@ export function tidyLegacySupplies(f){
  }
  return out;
 }
+
+ // Only remove a standalone duplicate whose content and lifetime are already preserved in the destination.
+export function dedupeLegacySupplies(f){
+  const copy=structuredClone(f),out={copy,count:0,review:0,changes:[]};
+  if(!copy.importSource||!copy.importOriginal)return out;
+  const specs=noteSpecs(copy),spec=(obj,key)=>specs.find(s=>s.obj===obj&&s.key===key);
+  for(const [kind,g] of Object.entries(copy.groups))for(const [type,o] of Object.entries(g.food)){
+   const src=spec(o,'note'),dst=spec(o,'location');
+   if(!src||!dst)continue;
+   const targets=noteRows(dst).filter(r=>!r.closed&&r.text.trim());
+   if(!targets.length)continue;
+   const rows=noteRows(src);let changed=false;
+   const noun={dry:'(?:補充)?飼料(?:備品)?|乾乾(?:備品)?',wet:'(?:罐頭|餐包|濕食)(?:備品)?',snack:'(?:零食|肉泥)(?:備品)?'}[type];
+   const pattern=new RegExp('^(?:備品(?:位置)?|'+noun+')(?:都|會|是|兩款都|均)?(?:放在|放於|在|[：:])([^。！？；，、\\n]+)[。.]?$');
+   const revised=[];
+   for(const row of rows){
+    if(row.closed||row.flag||row.ownerFlag){revised.push(row);continue;}
+    let removed=false;
+    const lines=row.text.split(/\r?\n/).filter(original=>{
+     const line=original.trim();if(!line)return true;
+     const stripped=line.replace(/^[🌟⭐📍➡️❣️\s]+/u,'').trim();
+     const extracted=pattern.exec(stripped)?.[1]?.trim();
+     const candidate=targets.find(t=>t.text.trim()===line||t.text.trim()===stripped||!!extracted&&t.text.trim()===extracted);
+     if(!candidate)return true;
+     if(row.temp!==candidate.temp||row.cycle!==candidate.cycle){out.review++;return true;}
+     removed=true;changed=true;out.count++;out.changes.push({kind,type,removed:original,kept:candidate.text});return false;
+    });
+    if(!removed)revised.push(row);
+    else if(lines.some(l=>l.trim()))revised.push({...row,text:lines.join('\n')});
+   }
+   if(changed)writeNoteRows(src,revised);
+  }
+  return out;
+ }
