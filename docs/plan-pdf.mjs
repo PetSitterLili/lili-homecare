@@ -1,17 +1,16 @@
-import {quoteLines,overtimeText} from './quote.mjs?v=2.0.1126.49';
-import {activeFamily,filename,careBlocks,serviceName,bookingLines} from './workspace-model.mjs?v=2.0.1126.49';
-import {brandDefaults,links,palette} from './brand.mjs?v=2.0.1126.49';
+import {quoteLines,overtimeText} from './quote.mjs?v=2.0.1126.50';
+import {activeFamily,filename,careBlocks,serviceName,bookingLines} from './workspace-model.mjs?v=2.0.1126.50';
+import {brandDefaults,links,palette} from './brand.mjs?v=2.0.1126.50';
 const W=794,H=1123,M=38,B=1060,inner=W-2*M;
 const clean=values=>values.filter(x=>typeof x==='string'&&x.trim());
 const sentence=value=>/[。！？.!?]$/.test(value.trim())?value.trim():value.trim()+'。';
 const petStory=p=>{
- const identity=clean([p.age,p.identity,p.sex]).join('');
- return clean([identity,p.neuter,p.health,p.personality,p.likes,p.avoid,p.area&&'常在'+p.area,p.intro]).map(sentence).join('');
+ const identity=clean([p.age,p.identity,p.sex]).join('・');
+ return clean([identity,p.neuter,p.health,p.personality,p.likes,p.avoid,p.area&&'常在'+p.area,p.intro]).map(s=>s.trim()).join('\n');
 };
 // Keep free-form directions intact. Join only fields with a known relationship.
 function together(...parts){
- return clean(parts).map(s=>s.trim()).reduce((text,next)=>
-  text+(text&&!/[。！？.!?，、；：\n]$/.test(text)?'，':'')+next,'');
+ return clean(parts).map(s=>s.trim()).join('\n');
 }
 const routineWaste=value=>/^(?:每趟|每次|每次到府)?(?:由)?(?:ㄌㄌ|保姆)(?:會)?(?:將垃圾|把垃圾)?帶走(?:垃圾)?[。！.]?$/.test(value?.trim());
 function careText(kind,o){
@@ -44,7 +43,7 @@ function careText(kind,o){
   case 'health':lines=[o.status,mark(detail)];break;
   case 'wash':return washLines(o);
  }
- return clean(lines).map(sentence);
+ return clean(lines).map(s=>s.trim());
 }
 function washLines(wash){
  if(wash.enabled===false)return ['本次不提供'];
@@ -115,7 +114,7 @@ export async function buildPDF(f,brand=brandDefaults){
  function ensure(height){if(y+height>B)page();}
  function section(title){
   if(cover)y+=7;
-  ensure(116);text(title,M,y+24,21,true,serviceTheme?goldInk:plum);y+=37;
+  ensure(160);text(title,M,y+24,21,true,serviceTheme?goldInk:plum);y+=37;
   rule(M,y,inner,serviceTheme?palette.promise.rule:lineColor);
   if(!serviceTheme)rule(M,y,38,lineColor);
   y+=9;
@@ -129,7 +128,7 @@ export async function buildPDF(f,brand=brandDefaults){
   const width=inner/items.length;
   const cols=items.map(([title,body])=>{
    const heads=wrap(title,width-32,16,true);
-   return {heads,lines:body.flatMap(s=>typeof s==='object'?wrap(s.note,width-32,12).map(t=>({note:t})):wrap(s,width-32)),pos:0};
+   return {heads,lines:body.flatMap(s=>typeof s==='object'?(s.subheading?wrap(s.subheading,width-32,15,true).map(t=>({subheading:t})):wrap(s.note,width-32,12).map(t=>({note:t}))):wrap(s,width-32)),pos:0};
   });
   if(cols.length>1){
    const heights=cols.map(col=>col.heads.length+col.lines.length);
@@ -143,7 +142,7 @@ export async function buildPDF(f,brand=brandDefaults){
    const inset=cover?12:0;
    const headHeight=inset+14+Math.max(...cols.map(col=>col.heads.length))*24;
    const fullHeight=headHeight+22+lineHeight*Math.max(1,...cols.map(col=>col.lines.length-col.pos));
-   if(!continued && fullHeight<420 && y+fullHeight>B && y>140)page();
+
    ensure(headHeight+22+lineHeight);
    const capacity=Math.max(1,Math.floor((B-y-headHeight-22)/lineHeight));
    const parts=cols.map(col=>col.lines.slice(col.pos,col.pos+capacity));
@@ -157,7 +156,7 @@ export async function buildPDF(f,brand=brandDefaults){
     if(continued&&!parts[k].length)return;
     col.heads.forEach((t,j)=>text(t,x+16,y+25+inset+j*24,16,true,serviceTheme?goldInk:plum));
     const baseline=y+headHeight+19;
-    parts[k].forEach((s,j)=>typeof s==='object'?text(s.note,x+16,baseline+j*lineHeight,12,false,'#82735D'):text(s,x+16,baseline+j*lineHeight,15,false,serviceTheme?palette.promise.text:ink));
+    parts[k].forEach((s,j)=>typeof s==='object'?(s.subheading?text(s.subheading,x+16,baseline+j*lineHeight,15,true,plum):text(s.note,x+16,baseline+j*lineHeight,12,false,'#82735D')):text(s,x+16,baseline+j*lineHeight,15,false,serviceTheme?palette.promise.text:ink));
     col.pos+=parts[k].length;
    });
    y+=height+9;continued=true;remaining=cols.some(col=>col.pos<col.lines.length);
@@ -199,16 +198,16 @@ export async function buildPDF(f,brand=brandDefaults){
  const basics=[
   ['陪伴毛孩的時間與細節',[...bookingLines(f.booking,f.groups),{note:'關於抵達與照護時間：預計抵達時段為保姆到府的時間範圍，並非照護服務的起訖時間。每趟服務將自實際抵達後開始計算，並完整提供約定的照護時間。'}]],
   ['回家的方式與門鎖安全',clean([f.entry.pickup&&(/^(已取|已取得)$/.test(f.entry.pickup.trim())?'鑰匙已取得。':'取鑰匙：'+f.entry.pickup),f.entry.door,f.entry.return&&(/^(最後一趟放門內|最後一趟放回門內)$/.test(f.entry.return.trim())?'最後一趟將鑰匙放回門內。':'還鑰匙：'+f.entry.return)])],
-  ['身體小狀況與特別照顧',care.filter(b=>b.id.endsWith('-health')).flatMap(b=>[b.title,...careText('health',f.groups[b.id.split('-')[0]].health)])]
+  ['身體小狀況與特別照顧',[...care.filter(b=>b.id.endsWith('-health')).flatMap(b=>[b.title,...careText('health',f.groups[b.id.split('-')[0]].health)]),...(f.hospital?[{subheading:'習慣去的動物醫院'},f.hospital]:[])]]
  ].filter(([,ls])=>ls.length);
  for(const item of basics){row([item]);if(item[0]==='陪伴毛孩的時間與細節'){const q=quoteLines(f);if(q.length)row([['本次照護費用',q]]);const ot=overtimeText(f.booking);if(ot)row([['加時照護費用',[{note:ot}]]]);}}
  const pets=Object.entries(f.groups).flatMap(([kind,g])=>g.pets.map(p=>[(kind==='cat'?'🐱 ':'🐶 ')+(p.name||'毛寶'),clean([petStory(p)])]));
  if(pets.length){section('毛孩的小個性與相處默契');rows(pets);}
- cover=false;page();
+ cover=false;
  const foods=care.filter(b=>/-(dry|wet|snack)$/.test(b.id));
  if(foods.length){section('每一餐的份量與愛吃的口味');
   for(const kind of Object.keys(f.groups)){
-   rows(foods.filter(b=>b.id.startsWith(kind+'-')).map(b=>[b.title,careText(b.id.split('-')[1],f.groups[kind].food[b.id.split('-')[1]])]),3);
+   rows(foods.filter(b=>b.id.startsWith(kind+'-')).map(b=>[b.title,careText(b.id.split('-')[1],f.groups[kind].food[b.id.split('-')[1]])]),2);
   }
  }
  const headings={water:'隨時隨地乾淨清爽的飲水',wash:'洗滌用品與位置',toilet:'如廁環境清潔與代謝觀察',play:'放鬆心情的玩耍與陪伴',walk:'散步與返家整理'};
@@ -232,7 +231,7 @@ export async function buildPDF(f,brand=brandDefaults){
    const lines=part.split('\n').slice(1).flatMap(t=>wrap(t,inner/2-32));
    return sum+60+lines.length*lineHeight;
   },0)/2;
-  if(y>B*.54&&bodyHeight+120>B-y)page();
+
   section('♡ 每一次陪伴，都是一份安心的交付');
   const sections=brand.service.trim().split(/\n\s*\n/).map(part=>{
    const [title,...body]=part.split('\n');

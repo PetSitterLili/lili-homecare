@@ -34,7 +34,7 @@ export function noteSpecs(f){
   }
  }
  for(const [k,l] of [['pickup','鑰匙取得'],['door','門鎖與防逃脫'],['return','鑰匙歸還']])add(f.entry,k,l,k==='door');
- add(f,'environment','門窗與電器',true);add(f,'extra','其他特殊交代');
+ add(f,'hospital','習慣去的動物醫院',true);add(f,'environment','門窗與電器',true);add(f,'extra','其他特殊交代');
  return out;
 }
 export function noteCycle(f){
@@ -44,9 +44,9 @@ export function noteCycle(f){
 export function noteRows(spec){
  const {obj,key,flag,prefix}=spec,raw=obj[noteMeta(key)];
  if(typeof raw==='string'){
-  try{const rows=JSON.parse(raw);if(Array.isArray(rows)&&rows.every(r=>r&&typeof r.id==='string'&&typeof r.text==='string'&&typeof r.flag==='boolean'&&typeof r.temp==='boolean'&&typeof r.cycle==='string'))return rows.map(r=>({id:r.id,text:r.text,flag:r.flag,temp:r.temp,cycle:r.cycle,closed:r.closed===true}));}catch{}
+  try{const rows=JSON.parse(raw);if(Array.isArray(rows)&&rows.every(r=>r&&typeof r.id==='string'&&typeof r.text==='string'&&typeof r.flag==='boolean'&&typeof r.temp==='boolean'&&typeof r.cycle==='string'))return rows.map(r=>({id:r.id,text:r.text,flag:r.flag,temp:r.temp,cycle:r.cycle,closed:r.closed===true,...(r.ownerFlag===true?{ownerFlag:true}:{})}));}catch{}
  }
- return typeof obj[key]==='string'&&obj[key].trim()?[{id:'legacy-'+prefix+'-'+key,text:obj[key],flag,temp:false,cycle:'',closed:false}]:[];
+ return typeof obj[key]==='string'&&obj[key].trim()?[{id:'legacy-'+prefix+'-'+key,text:obj[key],flag:false,temp:false,cycle:'',closed:false}]:[];
 }
 export function writeNoteRows(spec,rows){
  spec.obj[noteMeta(spec.key)]=JSON.stringify(rows);
@@ -69,7 +69,7 @@ export function expiredNoteWarnings(f){
  const w=[];
  for(const s of noteSpecs(f))for(const r of noteRows(s)){
   if(!r.text.trim()||r.closed||!r.temp||noteActive(f,r))continue;
-  if(r.flag||s.flag)w.push(s.title+'：上期指示待確認（'+r.text+'）');
+  w.push(s.title+'：上期指示待確認（'+r.text+'）');
  }
  return w;
 }
@@ -84,7 +84,7 @@ export function publicBlocks(f){f=activeFamily(f);return [
 {title:'本次預約',lines:bookingLines(f.booking,f.groups)},
 {title:'家長與聯絡資訊',lines:lines(f.contact,[['name','家長稱呼'],['phone','電話'],['emergency','緊急聯絡'],['address','服務地址']])},
 ...Object.entries(f.groups).map(([kind,g])=>({title:(kind==='dog'?'犬寶':'喵寶')+'的小個性與相處默契',lines:g.pets.flatMap(p=>[p.name||'姓名待確認',...lines(p,[['identity','辨識資料'],['personality','個性與禁忌'],['area','活動／躲藏位置']])])})),
-...careBlocks(f),
+...careBlocks(f),...(f.hospital?[{title:'習慣去的動物醫院',lines:[f.hospital]}]:[]),
 {title:'進出與門鎖安全',lines:lines(f.entry,[['pickup','鑰匙拿取'],['door','門鎖操作／防逃脫'],['return','鑰匙歸還'],['wifi','WiFi']])},
 {title:'門窗、電器與其他任務',lines:[f.environment,f.extra].filter(Boolean)}
 ].filter(b=>b.lines.length);}
@@ -98,11 +98,11 @@ export function tasks(f){
  }
  return result;
 }
-export function sourceKey(f){return JSON.stringify({cardVersion:2,contact:f.contact,booking:f.booking,groups:f.groups,entry:f.entry,environment:f.environment,extra:f.extra,media:f.media,environmentRows:f.careNoteRows_environment,extraRows:f.careNoteRows_extra});}
-export function normalize(raw){if(raw?.schema!==2||typeof raw.id!=='string'||typeof raw.name!=='string'||!raw.groups||!Array.isArray(raw.photos)||!Array.isArray(raw.runs)||raw.photos.length>1000||raw.runs.length>1000)throw Error('家庭資料格式不正確');const f=fresh();f.id=raw.id;if(raw.archived===true)f.archived=true;f.name=raw.name;if(raw.pendingAction===true)f.pendingAction=true;if(raw.profile)f.profile=readProfile(raw.profile);const safeObj=o=>{const result={};for(const[k,v]of Object.entries(o||{})){if(['__proto__','constructor','prototype'].includes(k))continue;if(typeof v==='string'||typeof v==='boolean'||v===null||Array.isArray(v)&&v.every(x=>typeof x==='string'))result[k]=v;}return result;};f.clientRisk={status:['normal','watch','blacklist'].includes(raw.clientRisk?.status)?raw.clientRisk.status:'normal',note:typeof raw.clientRisk?.note==='string'?raw.clientRisk.note:''};f.contact=safeObj(raw.contact);f.booking=safeObj(raw.booking);f.booking.services=Array.isArray(f.booking.services)?f.booking.services:[];f.media={status:['yes','no','pending'].includes(raw.media?.status)?raw.media.status:'pending',note:typeof raw.media?.note==='string'?raw.media.note:''};for(const k of ['decisionEditedAt','legacyConsentFixedAt'])if(typeof raw.media?.[k]==='string')f.media[k]=raw.media[k];if(typeof raw.media?.careNoteRows_note==='string')f.media.careNoteRows_note=raw.media.careNoteRows_note;f.entry=safeObj(raw.entry);f.environment=String(raw.environment||'');f.extra=String(raw.extra||'');for(const k of ['careNoteRows_environment','careNoteRows_extra'])if(typeof raw[k]==='string')f[k]=raw[k];f.updatedAt=typeof raw.updatedAt==='string'?raw.updatedAt:null;f.groups={};for(const kind of ['cat','dog'])if(raw.groups[kind]){const g=blanks(),src=raw.groups[kind];for(const type of Object.keys(g)){if(type==='pets'){g.pets=(Array.isArray(src.pets)?src.pets:[]).slice(0,100).map(safeObj);}else if(type==='food'){for(const t of ['dry','wet','snack'])g.food[t]=safeObj(src.food?.[t]);}else g[type]=safeObj(src[type]);}f.groups[kind]=g;}if(!Object.keys(f.groups).length)throw Error('缺少貓狗資料');f.photos=raw.photos.map(p=>{if(typeof p.id!=='string'||typeof p.name!=='string'||typeof p.caption!=='string'||!['image/jpeg','image/png','image/webp'].includes(p.mime)||typeof p.thumb!=='string'||!/^data:image\/(jpeg|png|webp);base64,/.test(p.thumb)||!Number.isFinite(p.size)||p.size<0)throw Error('照片格式不正確');return {id:p.id,name:p.name,caption:p.caption,mime:p.mime,thumb:p.thumb,size:p.size,...(typeof p.driveId==='string'?{driveId:p.driveId}:{})};});f.runs=raw.runs.map(r=>({id:String(r.id||''),label:String(r.label||''),source:String(r.source||''),tasks:(Array.isArray(r.tasks)?r.tasks:[]).map(t=>({id:String(t.id||''),title:String(t.title||''),detail:String(t.detail||'')})),checks:safeObj(r.checks),createdAt:String(r.createdAt||'')}));if(raw.lineReservations!==undefined){if(!Array.isArray(raw.lineReservations)||raw.lineReservations.length>500||raw.lineReservations.some(r=>!validReservation(r)||!['confirmed','adopted'].includes(r.state)))throw Error('LINE預約資料格式不正確');f.lineReservations=structuredClone(raw.lineReservations);}if(Array.isArray(raw.carePatchReceipts))f.carePatchReceipts=[...new Set(raw.carePatchReceipts.filter(s=>typeof s==='string'&&/^[a-zA-Z0-9-]{1,100}$/.test(s)))];if(raw.legacy)f.legacy=raw.legacy;if(raw.importReview===true)f.importReview=true;for(const k of ['importSource','importOriginal','importReviewedAt'])if(typeof raw[k]==='string')f[k]=raw[k];return f;}
+export function sourceKey(f){return JSON.stringify({cardVersion:2,contact:f.contact,booking:f.booking,groups:f.groups,entry:f.entry,environment:f.environment,extra:f.extra,media:f.media,environmentRows:f.careNoteRows_environment,extraRows:f.careNoteRows_extra,...(f.hospital||f.careNoteRows_hospital?{hospital:f.hospital,hospitalRows:f.careNoteRows_hospital}:{})});}
+export function normalize(raw){if(raw?.schema!==2||typeof raw.id!=='string'||typeof raw.name!=='string'||!raw.groups||!Array.isArray(raw.photos)||!Array.isArray(raw.runs)||raw.photos.length>1000||raw.runs.length>1000)throw Error('家庭資料格式不正確');const f=fresh();f.id=raw.id;if(raw.archived===true)f.archived=true;f.name=raw.name;if(raw.pendingAction===true)f.pendingAction=true;if(raw.profile)f.profile=readProfile(raw.profile);const safeObj=o=>{const result={};for(const[k,v]of Object.entries(o||{})){if(['__proto__','constructor','prototype'].includes(k))continue;if(typeof v==='string'||typeof v==='boolean'||v===null||Array.isArray(v)&&v.every(x=>typeof x==='string'))result[k]=v;}return result;};f.clientRisk={status:['normal','watch','blacklist'].includes(raw.clientRisk?.status)?raw.clientRisk.status:'normal',note:typeof raw.clientRisk?.note==='string'?raw.clientRisk.note:''};f.contact=safeObj(raw.contact);f.booking=safeObj(raw.booking);f.booking.services=Array.isArray(f.booking.services)?f.booking.services:[];f.media={status:['yes','no','pending'].includes(raw.media?.status)?raw.media.status:'pending',note:typeof raw.media?.note==='string'?raw.media.note:''};for(const k of ['decisionEditedAt','legacyConsentFixedAt'])if(typeof raw.media?.[k]==='string')f.media[k]=raw.media[k];if(typeof raw.media?.careNoteRows_note==='string')f.media.careNoteRows_note=raw.media.careNoteRows_note;f.entry=safeObj(raw.entry);f.hospital=typeof raw.hospital==='string'?raw.hospital:'';f.environment=String(raw.environment||'');f.extra=String(raw.extra||'');for(const k of ['careNoteRows_hospital','careNoteRows_environment','careNoteRows_extra'])if(typeof raw[k]==='string')f[k]=raw[k];f.updatedAt=typeof raw.updatedAt==='string'?raw.updatedAt:null;f.groups={};for(const kind of ['cat','dog'])if(raw.groups[kind]){const g=blanks(),src=raw.groups[kind];for(const type of Object.keys(g)){if(type==='pets'){g.pets=(Array.isArray(src.pets)?src.pets:[]).slice(0,100).map(safeObj);}else if(type==='food'){for(const t of ['dry','wet','snack'])g.food[t]=safeObj(src.food?.[t]);}else g[type]=safeObj(src[type]);}f.groups[kind]=g;}if(!Object.keys(f.groups).length)throw Error('缺少貓狗資料');f.photos=raw.photos.map(p=>{if(typeof p.id!=='string'||typeof p.name!=='string'||typeof p.caption!=='string'||!['image/jpeg','image/png','image/webp'].includes(p.mime)||typeof p.thumb!=='string'||!/^data:image\/(jpeg|png|webp);base64,/.test(p.thumb)||!Number.isFinite(p.size)||p.size<0)throw Error('照片格式不正確');return {id:p.id,name:p.name,caption:p.caption,mime:p.mime,thumb:p.thumb,size:p.size,...(typeof p.driveId==='string'?{driveId:p.driveId}:{})};});f.runs=raw.runs.map(r=>({id:String(r.id||''),label:String(r.label||''),source:String(r.source||''),tasks:(Array.isArray(r.tasks)?r.tasks:[]).map(t=>({id:String(t.id||''),title:String(t.title||''),detail:String(t.detail||'')})),checks:safeObj(r.checks),createdAt:String(r.createdAt||'')}));if(raw.lineReservations!==undefined){if(!Array.isArray(raw.lineReservations)||raw.lineReservations.length>500||raw.lineReservations.some(r=>!validReservation(r)||!['confirmed','adopted'].includes(r.state)))throw Error('LINE預約資料格式不正確');f.lineReservations=structuredClone(raw.lineReservations);}if(Array.isArray(raw.carePatchReceipts))f.carePatchReceipts=[...new Set(raw.carePatchReceipts.filter(s=>typeof s==='string'&&/^[a-zA-Z0-9-]{1,100}$/.test(s)))];if(raw.legacy)f.legacy=raw.legacy;if(raw.importReview===true)f.importReview=true;for(const k of ['importSource','importOriginal','importReviewedAt'])if(typeof raw[k]==='string')f[k]=raw[k];return f;}
 export function migrate(old,oldText){const f=fresh();f.id=old.id;f.name=old.name;f.updatedAt=old.updatedAt;f.photos=old.photos||[];f.legacy=old;f.extra='舊版資料完整保留，請確認後逐步整理到新欄位。\n\n'+oldText;return f;}
 
-import {catPlanNames,displayQuoteLabel,mixedPlan,mixedCare,mixedService} from './quote.mjs?v=2.0.1126.49';
+import {catPlanNames,displayQuoteLabel,mixedPlan,mixedCare,mixedService} from './quote.mjs?v=2.0.1126.50';
 // Legacy service keys remain valid in stored families and visit cards.
 export function serviceName(service,groups){
  if(groups.cat&&groups.dog&&mixedService(service))return mixedPlan;
@@ -318,3 +318,24 @@ export function validServiceDate(s){if(!/^\d{4}-\d{2}-\d{2}$/.test(s))return '';
 export function compareServiceDates(a,b,dir=1){const x=readProfile(a.profile),y=readProfile(b.profile);if(!x.firstServiceMonth||!y.firstServiceMonth)return x.firstServiceMonth?-1:y.firstServiceMonth?1:0;const month=x.firstServiceMonth.localeCompare(y.firstServiceMonth)*dir;if(month)return month;if(!x.firstServiceDate||!y.firstServiceDate)return x.firstServiceDate?-1:y.firstServiceDate?1:0;return x.firstServiceDate.localeCompare(y.firstServiceDate)*dir;}
 export function familyModifiedTime(f){const v=f?.updatedAt;if(typeof v!=='string'||!v.trim())return null;const t=Date.parse(v);return Number.isFinite(t)?t:null;}
 export function sortFamilyDirectory(records,mode='upcoming',today=taipeiDate()){const name=(a,b)=>String(a.f.name||'').localeCompare(String(b.f.name||''),'zh-Hant-TW');return [...records].sort((a,b)=>{if(mode==='name')return name(a,b);if(mode==='modified'){const x=familyModifiedTime(a.f),y=familyModifiedTime(b.f);return (x===null?(y===null?0:1):y===null?-1:y-x)||name(a,b);}if(mode==='oldest'||mode==='newest')return compareServiceDates(a.f,b.f,mode==='newest'?-1:1)||name(a,b);const blacklistOrder=Number(a.f.clientRisk?.status==='blacklist')-Number(b.f.clientRisk?.status==='blacklist');if(blacklistOrder)return blacklistOrder;const pendingOrder=Number(b.f.pendingAction===true)-Number(a.f.pendingAction===true);if(pendingOrder)return pendingOrder;const x=nextBookingDate(a.f,today),y=nextBookingDate(b.f,today);return (x&&y?x.localeCompare(y):x?-1:y?1:0)||compareServiceDates(a.f,b.f)||name(a,b);});}
+
+export function clearCareFlags(f){const copy=structuredClone(f);let count=0;for(const s of noteSpecs(copy)){const rows=noteRows(s);let changed=false;for(const r of rows)if(r.flag){r.flag=false;delete r.ownerFlag;count++;changed=true;}if(changed)s.obj[noteMeta(s.key)]=JSON.stringify(rows);}return {copy,count};}
+
+export function relocateLegacyHospital(f){
+ const copy=structuredClone(f),out={copy,moved:0,review:0};
+ if(!copy.importOriginal||!copy.importSource)return out;
+ const original=copy.importOriginal.replace(/\r\n/g,'\n');
+ const match=original.match(/(?:^|\n)【指定救援醫院】[ \t]*\n([\s\S]*?)(?=\n【|$)/);
+ const raw=match?.[1].trim();if(!raw||/^(無|暫無|沒有|尚無|未指定|不指定)[。.]?$/.test(raw))return out;
+ const specs=noteSpecs(copy),hs=specs.find(s=>s.obj===copy&&s.key==='hospital'),es=specs.find(s=>s.obj===copy&&s.key==='extra');
+ const rows=noteRows(es),existing=noteRows(hs);
+ const candidates=rows.filter(r=>/^舊指定救援醫院(?:（請確認）)?[：:]/.test(r.text)&&r.text.replace(/^舊指定救援醫院(?:（請確認）)?[：:]\s*/,'').trim()===raw);
+ if(existing.length){if(candidates.length||!existing.some(r=>r.text===raw))out.review++;return out;}
+ if(candidates.length!==1||Object.values(copy.groups).some(g=>String(g.health.note||'').includes(raw))){out.review++;return out;}
+ const r=candidates[0];
+ if(r.ownerFlag||r.closed){out.review++;return out;}
+ // Preserve the exact source, but require owner review before use.
+ writeNoteRows(hs,[{...r,text:raw,flag:false,temp:true,cycle:'legacy:'+copy.importSource+':hospital'}]);
+ writeNoteRows(es,rows.filter(x=>x!==r));
+ out.moved=1;return out;
+}

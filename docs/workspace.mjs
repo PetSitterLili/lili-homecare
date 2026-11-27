@@ -1,13 +1,13 @@
-import {inspectCarePatch,applyCarePatch} from './care-patch.mjs?v=2.0.1126.49';
-import {rememberGrant,recallGrant,forgetGrant} from './tab-grant.mjs?v=2.0.1126.49';
-import {displayQuoteLabel,legacyQuoteReference,oldBookingText,hasCurrentBooking,inquiryQuote,mixedPlan,mixedCare,mixedService,defaultRates,readRates,days,travel,rate,holidayRows,quoteKey,savedQuote,quoteLines,money,overtimeText} from './quote.mjs?v=2.0.1126.49';
-import {brandDefaults,readBrand} from './brand.mjs?v=2.0.1126.49';
+import {inspectCarePatch,applyCarePatch} from './care-patch.mjs?v=2.0.1126.50';
+import {rememberGrant,recallGrant,forgetGrant} from './tab-grant.mjs?v=2.0.1126.50';
+import {displayQuoteLabel,legacyQuoteReference,oldBookingText,hasCurrentBooking,inquiryQuote,mixedPlan,mixedCare,mixedService,defaultRates,readRates,days,travel,rate,holidayRows,quoteKey,savedQuote,quoteLines,money,overtimeText} from './quote.mjs?v=2.0.1126.50';
+import {brandDefaults,readBrand} from './brand.mjs?v=2.0.1126.50';
 
-import {validReservation,reservationPeriods,readLineReservations,reservationLines,reservationSegments,inspectLineReservations,applyLineReservations,sortFamilyDirectory,validServiceDate,taipeiDate,nextBookingDate,orderUpcomingFamilies,recentFamilyIds,profileStages,safeProfileUrl,readProfile,familyArea,profileAge,matchesProfile,prepareProfilePatch,applyProfilePatch,bookingDateGroups,replaceBookingDates,bookingDateLabel,lineHistory,prepareLineHistory,applyLineHistory,syncOverview,matchesFamily,prepareLegacyBatch,noteSpecs,noteRows,writeNoteRows,noteCycle,noteActive,bindPendingNotes,activeFamily,bookingSegments,bookingLines,serviceName,fresh,blanks,fields,titles,day,filename,mediaLabel,warnings,publicBlocks,tasks,sourceKey,normalize,migrate} from './workspace-model.mjs?v=2.0.1126.49';
-import {makeText as legacyText} from './model.mjs?v=2.0.1126.49';
-import {DriveStore,digest} from './drive.mjs?v=2.0.1126.49';
-import {openDB,storeDB} from './drafts.mjs?v=2.0.1126.49';
-import {buildPDF,auditLegacyCoverage} from './plan-pdf.mjs?v=2.0.1126.49';
+import {clearCareFlags,relocateLegacyHospital,validReservation,reservationPeriods,readLineReservations,reservationLines,reservationSegments,inspectLineReservations,applyLineReservations,sortFamilyDirectory,validServiceDate,taipeiDate,nextBookingDate,orderUpcomingFamilies,recentFamilyIds,profileStages,safeProfileUrl,readProfile,familyArea,profileAge,matchesProfile,prepareProfilePatch,applyProfilePatch,bookingDateGroups,replaceBookingDates,bookingDateLabel,lineHistory,prepareLineHistory,applyLineHistory,syncOverview,matchesFamily,prepareLegacyBatch,noteSpecs,noteRows,writeNoteRows,noteCycle,noteActive,bindPendingNotes,activeFamily,bookingSegments,bookingLines,serviceName,fresh,blanks,fields,titles,day,filename,mediaLabel,warnings,publicBlocks,tasks,sourceKey,normalize,migrate} from './workspace-model.mjs?v=2.0.1126.50';
+import {makeText as legacyText} from './model.mjs?v=2.0.1126.50';
+import {DriveStore,digest} from './drive.mjs?v=2.0.1126.50';
+import {openDB,storeDB} from './drafts.mjs?v=2.0.1126.50';
+import {buildPDF,auditLegacyCoverage} from './plan-pdf.mjs?v=2.0.1126.50';
 const $=id=>document.getElementById(id),drive=new DriveStore(),db=storeDB(await openDB().catch(error=>{$('main').innerHTML='<div class="panel"><h1>目前無法啟用草稿保存</h1><p>此瀏覽器未能開啟本機資料庫，請換外部瀏覽器或檢查儲存空間；尚未開放填寫，避免資料遺失。</p></div>';throw error;}));
 let records=await db.all(),entry=null,view='service',kind='cat',petIndex=0,undo=[],syncTimer,localChain=Promise.resolve(),syncBusy=false,photoBusy=false,pdf=null,photoUrl=null,localFailure=false;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -116,7 +116,7 @@ function careNoteField(spec,label,placeholder){
  const list=document.createElement('div');list.className='care-note-list';wrap.append(list);
  let rows=noteRows(spec);
  // An empty initial row is only persisted if the user interacts with it.
- const blank=()=>({id:crypto.randomUUID(),text:'',flag:spec.flag,temp:false,cycle:'',closed:false});
+ const blank=()=>({id:crypto.randomUUID(),text:'',flag:false,temp:false,cycle:'',closed:false});
  if(!rows.length)rows=[blank()];
  const save=()=>{writeNoteRows(spec,rows);dirty();};
  const resize=resizeCareNote;
@@ -129,7 +129,7 @@ function careNoteField(spec,label,placeholder){
    const state=document.createElement('small');state.className='care-note-state';body.append(state);
    const actions=document.createElement('div');actions.className='care-note-actions';
    const flagGroup=document.createElement('div');flagGroup.className='care-note-flag-group';
-   const flag=button('',()=>{snapshot();n.flag=!n.flag;save();paint();},'care-note-flag');
+   const flag=button('',()=>{snapshot();n.flag=!n.flag;n.ownerFlag=true;save();paint();},'care-note-flag');
    const flagIcon=document.createElementNS('http://www.w3.org/2000/svg','svg');flagIcon.setAttribute('viewBox','0 0 28 28');flagIcon.setAttribute('aria-hidden','true');
    flagIcon.innerHTML='<path d="M6 25V4 M6 5C12 0 17 10 23 4V17C17 23 12 12 6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><g class="care-note-clock"><circle cx="21" cy="21" r="6.5" fill="#F8F5EE" stroke="currentColor" stroke-width="1.3"/><path d="M21 17V21L24 22" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></g>';
    flag.append(flagIcon);
@@ -137,7 +137,7 @@ function careNoteField(spec,label,placeholder){
    const menu=document.createElement('div');menu.className='care-note-menu';menu.hidden=true;
    const toggleMenu=()=>{const open=menu.hidden;document.querySelectorAll('.care-note-menu').forEach(e=>{e.hidden=true;e.parentElement.querySelector('.care-note-arrow')?.setAttribute('aria-expanded','false');});menu.hidden=!open;arrow.setAttribute('aria-expanded',String(open));};
    const options=[['不加入小卡',false,false],['長期複核',true,false],['僅限本期複核',true,true],['僅限本期備註',false,true]];
-   for(const [caption,flagged,temp] of options){menu.append(button(caption,()=>{snapshot();Object.assign(n,{flag:flagged,temp,cycle:temp?noteCycle(f):'',closed:false});save();menu.hidden=true;arrow.setAttribute('aria-expanded','false');paint();}));}
+   for(const [caption,flagged,temp] of options){menu.append(button(caption,()=>{snapshot();Object.assign(n,{flag:flagged,temp,cycle:temp?noteCycle(f):'',closed:false,ownerFlag:true});save();menu.hidden=true;arrow.setAttribute('aria-expanded','false');paint();}));}
    const end=button('結束本期事項（保留歷史）',()=>{snapshot();n.closed=true;save();menu.hidden=true;arrow.setAttribute('aria-expanded','false');paint();});menu.append(end);
    let timer=null,longPress=false;
    flag.addEventListener('pointerdown',()=>{longPress=false;timer=setTimeout(()=>{longPress=true;toggleMenu();},480);});
@@ -329,11 +329,12 @@ for(const type of ['health','dry','wet','snack','water','wash','play','toilet','
  if(type==='walk'&&kind!=='dog')continue;const o=group.food[type]||group[type],food=['dry','wet','snack'].includes(type);
  careBlock(content,f,kind+'-'+type,titles[type],type,body=>{
  if(food&&o.enabled===false){body.append(crmEl('p','本次不需提供'+titles[type]+'。','care-read-value'));careReadFields(f,o,[['note','留存交代（非本期指令）']],body,{inactive:true});const retained=section('查看留存品項與份量等資料',false);careReadFields(f,o,fields[type].filter(([k])=>k!=='note'),retained.body,{inactive:true});if(type==='dry'&&o.mix)careReadFields(f,o,[['mixItem','混糧品項'],['mixAmount','混糧比例']],retained.body,{inactive:true});if(retained.body.children.length)body.append(retained.e);return;}
- careReadFields(f,o,fields[type],body);if(type==='dry'&&o.mix){body.append(crmEl('p','需要混糧','care-read-value'));careReadFields(f,o,[['mixItem','另一款飼料'],['mixAmount','兩款比例／各自份量']],body);}if(type==='walk'&&o.parts?.length)body.append(crmEl('p','返家整理：'+o.parts.join('、'),'care-read-value'));
+ careReadFields(f,o,fields[type],body);if(type==='health')careReadFields(f,f,[['hospital','習慣去的動物醫院']],body);if(type==='dry'&&o.mix){body.append(crmEl('p','需要混糧','care-read-value'));careReadFields(f,o,[['mixItem','另一款飼料'],['mixAmount','兩款比例／各自份量']],body);}if(type==='walk'&&o.parts?.length)body.append(crmEl('p','返家整理：'+o.parts.join('、'),'care-read-value'));
  },body=>{
  if(food){body.append(check('本次提供',o.enabled!==false,yes=>{snapshot();o.enabled=yes;dirty();render();}));if(o.enabled===false){body.append(field(o,'note','留存交代／不提供原因（不列為本期餵食指令）',{long:true}));return;}}
  const g=grid();for(const[k,l]of fields[type]){if(['amount','unit'].includes(k)){if(k==='amount')g.append(quantity(o));continue;}if(k==='waste'&&!o.waste){const details=section('特殊垃圾處理',false);details.body.append(field(o,k,'這家的特殊交代'));g.append(details.e);continue;}
  const opts=k==='leftover'?['清掉換新','留到下一趟整理','移出洗碗後放回','沿用並補新糧','集中處理，詳見補充']:type==='health'&&k==='status'?['目前無需處置','需要處置','觀察即可','待家長提供']:type==='wash'&&['sponge','soap'].includes(k)?['有，寵物專用','有，使用方式待確認','與人共用','不使用','無','無寵物專用，使用方式待確認','待家長提供']:null;g.append(field(o,k,l,{long:['note','returnNote'].includes(k),options:opts,compact:!!opts}));}body.append(g);
+ if(type==='health')body.append(field(f,'hospital','習慣去的動物醫院',{long:true}));
  if(type==='dry'){body.append(check('需要混糧',!!o.mix,yes=>{snapshot();o.mix=yes;dirty();render();}));if(o.mix){const g=grid();g.append(field(o,'mixItem','另一款飼料'),field(o,'mixAmount','兩款比例／各自份量'));body.append(g);}}
  if(type==='walk'){body.append(heading('返家清潔檢查'));const c=crmEl('div','','checks');for(const part of ['臉／眼周','嘴巴','前腳','後腳','屁股／外陰','身體／雨天擦乾'])c.append(check(part,(o.parts||[]).includes(part),yes=>{snapshot();o.parts=yes?[...new Set([...(o.parts||[]),part])]:(o.parts||[]).filter(x=>x!==part);dirty();}));body.append(c);}
  });
@@ -513,6 +514,42 @@ async function returnDirectory({archive=archiveView}={}){
  try{await db.put('settings','','lastFamily');}catch(e){toast('未能保存上次瀏覽位置：'+e.message);}
  render();
 }
+
+
+async function cleanupCareData(mode){
+ if(importingLegacy||draining||syncBusy||photoBusy||connecting||brandSyncActive)return toast('請等目前作業完成');
+ importingLegacy=true;status();
+ try{
+  await localChain;
+  const compute=f=>{if(mode==='flags'){const r=clearCareFlags(f);return {copy:r.copy,count:r.count,review:0};}const r=relocateLegacyHospital(f);return {copy:r.copy,count:r.moved,review:r.review};};
+  const plan=records.filter(r=>mode==='flags'||!r.f.archived).map(r=>({r,f:r.f,rev:r.rev,result:compute(r.f)}));
+  const count=plan.reduce((n,x)=>n+x.result.count,0),review=plan.filter(x=>x.result.review);
+  const body=crmEl('div'),dlg=crmDialog(mode==='flags'?'清除全域小卡旗標':'整理舊家訪醫院',body);
+  body.append(crmEl('p',mode==='flags'?'全部家庭目前的旗標（含已刪除家庭）都改為不加入小卡。文字、時效、待確認狀態及已產生的歷史小卡不變。':'只搬移原問卷「指定救援醫院」與舊其他任務完全相符的資料，保留完整原文，搬移後仍待你確認。','muted'));
+  body.append(crmEl('strong','預計 '+plan.filter(x=>x.result.count).length+' 戶，'+count+' 項'));
+  if(review.length){const s=section('有差異，未自動搬移（'+review.length+' 戶）',false);for(const x of review)s.body.append(crmEl('p',x.f.name));body.append(s.e);}
+  const cancel=dlg.querySelector(':scope > button:last-child');
+  const apply=button(mode==='flags'?'確認清除全部旗標':'確認搬移醫院',async()=>{
+   if(apply.disabled)return;if(!ready()||draining||syncBusy||connecting||photoBusy||brandSyncActive)return toast('請先連線 Drive 並完成同步。');
+   apply.disabled=true;cancel.disabled=true;
+   try{
+    await localChain;let saved=0,skip=0;
+    for(const x of plan){
+     if(!x.result.count)continue;const r=x.r;
+     if(!records.includes(r)||r.f!==x.f||r.rev!==x.rev||!r.remote||r.rev!==r.syncedRev||pending.get(r.id)||failures.has(r.id)||blocked.has(r.id)){skip++;continue;}
+     const result=compute(r.f);if(!result.count)continue;
+     result.copy.updatedAt=new Date().toISOString();const next={...r,f:result.copy,rev:r.rev+1};
+     if(!await db.replaceUnchanged(r,next)){skip++;continue;}Object.assign(r,next);saved+=result.count;
+    }
+    dlg.close();undo=[];pdf=null;render();toast('已保存 '+saved+' 項，略過 '+skip+' 戶；請核對同步狀態。'+(review.length?' 另有 '+review.length+' 戶醫院待核對。':''));
+   }catch(e){toast('未全部完成，可重新開啟檢查。'+e.message);}
+   finally{apply.disabled=false;cancel.disabled=false;}
+  },'primary');
+  apply.disabled=!count;body.append(apply);dlg.addEventListener('cancel',e=>{if(cancel.disabled)e.preventDefault();});
+  await new Promise(resolve=>{dlg.addEventListener('close',resolve,{once:true});dlg.showModal();});
+ }catch(e){toast('無法完成預覽：'+e.message);}
+ finally{importingLegacy=false;schedule();status();}
+}
 async function importCareFields(file){
  if(importingLegacy||syncBusy||draining||photoBusy||connecting)return toast('請等目前作業完成');
  importingLegacy=true;status();
@@ -641,6 +678,7 @@ function editLineReservation(f,r){
 }
 
 function wireMenu(){
+ $('clearCareFlags').onclick=()=>cleanupCareData('flags');$('relocateHospital').onclick=()=>cleanupCareData('hospital');
  $('lineBookingImport').onclick=()=>$('lineBookingFile').click();$('lineBookingFile').onchange=e=>{if(e.target.files[0])importLineBookings(e.target.files[0]);};
  $('carePatchImport').onclick=()=>$('carePatchFile').click();$('carePatchFile').onchange=e=>{if(e.target.files[0])importCareFields(e.target.files[0]);};
  const menu=$('appMenu');

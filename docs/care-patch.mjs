@@ -1,4 +1,4 @@
-import {noteSpecs,fields} from './workspace-model.mjs?v=2.0.1126.49';
+import {noteSpecs,fields} from './workspace-model.mjs?v=2.0.1126.50';
 
 const own=(o,k)=>Object.hasOwn(o,k)?o[k]:null;
 const same=(a,b)=>a.value===b.value&&a.rows===b.rows;
@@ -11,7 +11,7 @@ function target(f,path){
  }else if(['cat','dog'].includes(species)&&Object.hasOwn(fields,section)&&fields[section].some(([k])=>k===key)){
   obj=f.groups[species]?.food[section]||f.groups[species]?.[section];
  }else if(species==='home'&&section==='entry'&&['pickup','door','return'].includes(key))obj=f.entry;
- else if(species==='home'&&section==='family'&&['environment','extra'].includes(key))obj=f;
+ else if(species==='home'&&section==='family'&&['environment','extra','hospital'].includes(key))obj=f;
  return obj&&path.split('/').length===3?{obj,key}:null;
 }
 function validState(state){
