@@ -241,3 +241,22 @@ dialog.family-filter-dialog[open]{display:flex;flex-direction:column}
 
 /* Quick quote: optional range picker and the same centered visit wheel as booking. */
 .quick-period-top .quick-date-pick{flex:1;min-width:0;text-align:left;white-space:normal;overflow-wrap:anywhere;background:#f4ebe2;border-color:#e5d6c7;color:#80664f;padding:9px 10px}.quick-period-row [hidden],.quick-period-box [hidden]{display:none!important}.quick-calendar-panel{padding:8px 0}.quick-calendar-nav,.quick-calendar-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:6px 0}.quick-calendar-nav button{min-width:40px}.quick-calendar-foot small{flex:1}.quick-calendar-foot button{min-width:62px}.quick-calendar-panel .booking-calendar button{position:relative;min-height:39px}.quick-holiday-day:after{content:'';position:absolute;bottom:3px;left:calc(50% - 2px);height:4px;width:4px;background:#c49a50;border-radius:50%}.quick-wheel-wrap{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:5px 0}.quick-count-wheel{width:112px;flex:none}.quick-count-wheel .booking-scroll button[aria-pressed=true]{color:#66596f;font-weight:700}.quick-period-box>button{font-size:13px;min-height:36px}
+
+/* Compact field headings and touch numeric wheels. */
+.crm-modal label:not(:has(>input[type=checkbox])),.fieldhead,.quick-inquiry .quick-count label,.care-reading-body .care-edit-grid .fieldhead,.care-reading-body .care-edit-daily .fieldhead{font-size:12px;line-height:1.35;font-weight:550;white-space:nowrap;min-width:0}
+.crm-modal .crm-fields>label,.quick-count{min-width:0}
+.crm-modal .crm-fields>label{overflow:hidden;text-overflow:ellipsis}
+.fieldhead>span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.crm-modal .label-qualifier{font-size:.85em}
+.number-wheel-field{display:flex;align-items:stretch;gap:4px;width:100%;min-width:0}
+.number-wheel-field input{flex:1;min-width:0;width:0;text-align:center;appearance:textfield;-moz-appearance:textfield}
+.number-wheel-field input::-webkit-inner-spin-button,.number-wheel-field input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.number-wheel-trigger,.quick-stepper .number-wheel-trigger{flex:none;width:36px;min-width:36px;padding:0;font-size:20px;color:#786b86;background:#f4f0f7;border-radius:9px}
+.numeric-picker-tools{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.numeric-picker-wheel{margin:8px 0 12px}
+.numeric-picker-wheel .booking-scroll button[aria-pressed=true]{font-weight:700;color:#66596f}
+.numeric-picker>.primary,.numeric-picker>button{width:100%;margin:4px 0}
+.quick-inquiry .quick-stepper .number-wheel-field{flex:1}
+#families .pending-bookmark{position:absolute;top:0;right:40px;width:13px;height:23px;background:linear-gradient(105deg,#81502d 0%,#b57b42 27%,#e4bc79 47%,#c59858 64%,#8e572f 100%);clip-path:polygon(0 0,100% 0,100% 100%,50% 76%,0 100%);filter:drop-shadow(1px 2px 1px #78502d55);border-radius:1px 1px 0 0;pointer-events:none}
+#families .family-card-open[data-pending-action=true] .family-name-line{padding-right:15px}
+@media(max-width:480px){.crm-modal .crm-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.crm-modal .crm-fields>label:has(.label-qualifier){grid-column:auto}.crm-modal .crm-fields>label{font-size:11.5px}}
