@@ -42,7 +42,7 @@ export function inquiryQuote(input,r=defaultRates){
   if(walk==='long')result.warnings.push('較長時間散步須先確認實際需求，以上非長時間散步正式報價。');
  }else{
   add('生活照顧',catPlanNames['生活照顧'],base);
-  add('陪伴專案',catPlanNames['陪伴專案'],'包含生活照顧方案的完整內容，並增加深度互動與陪伴時間，依毛寶意願安排遊戲、安撫、梳毛及眼鼻分泌物清潔等。簡易點藥或其他個別健康照護依事先約定，相關加購費用另行確認。');
+  add('陪伴專案',catPlanNames['陪伴專案'],'包含完整的生活照顧內容，並增加陪伴與互動時間，依毛寶的意願安排陪玩、摸摸、梳毛及眼鼻分泌物清潔等。簡易點藥及其他個別健康照護依事先約定確認，相關加購費用另行確認。');
  }
  if(!result.options.length)result.warnings.push(d>=3?'目前三位犬寶（含）以上的家庭暫不承接，謝謝您的理解。':'此家庭規模須個別評估承接與報價。');
  if(med==='yes')result.warnings.push('有醫囑／餵藥需求，請提供對象、藥品、份量、頻率及操作方式，確認能否承接及是否需調整時間與報價。');
@@ -117,7 +117,7 @@ export function quickPeriodQuote(input,r=defaultRates){
  }
  const visible=result.options.filter(o=>!o.reference);
  const kids=[Number(input.c)?Number(input.c)+' 位喵寶小朋友':'',Number(input.d)?Number(input.d)+' 位犬寶小朋友':''].filter(Boolean).join('、');
- const lines=['爸爸／媽媽您好呀～ 🐾','目前依家中 '+kids+' 的照護需求及現行價目表，幫您整理這次的初步報價唷！','','照護日期：'+result.dateLabel,'共 '+trips+' 趟到府照護。'];
+ const lines=['爸爸／媽媽您好呀～ 🐾','目前依家中 '+kids+'的照護需求及現行價目表，幫您整理這次的初步報價唷！','','照護日期：'+result.dateLabel,'共 '+trips+' 趟到府照護。'];
  for(const [i,o] of visible.entries()){
   lines.push('',(visible.length>1?['① ','② '][i]||'':'')+o.title+'｜'+o.min+' 分鐘','照護內容：'+o.detail);
   if(o.unit!==null){
