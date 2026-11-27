@@ -1,13 +1,13 @@
-import {inspectCarePatch,applyCarePatch} from './care-patch.mjs?v=2.0.1126.50';
-import {rememberGrant,recallGrant,forgetGrant} from './tab-grant.mjs?v=2.0.1126.50';
-import {displayQuoteLabel,legacyQuoteReference,oldBookingText,hasCurrentBooking,inquiryQuote,mixedPlan,mixedCare,mixedService,defaultRates,readRates,days,travel,rate,holidayRows,quoteKey,savedQuote,quoteLines,money,overtimeText} from './quote.mjs?v=2.0.1126.50';
-import {brandDefaults,readBrand} from './brand.mjs?v=2.0.1126.50';
+import {inspectCarePatch,applyCarePatch} from './care-patch.mjs?v=2.0.1126.51';
+import {rememberGrant,recallGrant,forgetGrant} from './tab-grant.mjs?v=2.0.1126.51';
+import {displayQuoteLabel,legacyQuoteReference,oldBookingText,hasCurrentBooking,inquiryQuote,mixedPlan,mixedCare,mixedService,defaultRates,readRates,days,travel,rate,holidayRows,quoteKey,savedQuote,quoteLines,money,overtimeText} from './quote.mjs?v=2.0.1126.51';
+import {brandDefaults,readBrand} from './brand.mjs?v=2.0.1126.51';
 
-import {clearCareFlags,relocateLegacyHospital,validReservation,reservationPeriods,readLineReservations,reservationLines,reservationSegments,inspectLineReservations,applyLineReservations,sortFamilyDirectory,validServiceDate,taipeiDate,nextBookingDate,orderUpcomingFamilies,recentFamilyIds,profileStages,safeProfileUrl,readProfile,familyArea,profileAge,matchesProfile,prepareProfilePatch,applyProfilePatch,bookingDateGroups,replaceBookingDates,bookingDateLabel,lineHistory,prepareLineHistory,applyLineHistory,syncOverview,matchesFamily,prepareLegacyBatch,noteSpecs,noteRows,writeNoteRows,noteCycle,noteActive,bindPendingNotes,activeFamily,bookingSegments,bookingLines,serviceName,fresh,blanks,fields,titles,day,filename,mediaLabel,warnings,publicBlocks,tasks,sourceKey,normalize,migrate} from './workspace-model.mjs?v=2.0.1126.50';
-import {makeText as legacyText} from './model.mjs?v=2.0.1126.50';
-import {DriveStore,digest} from './drive.mjs?v=2.0.1126.50';
-import {openDB,storeDB} from './drafts.mjs?v=2.0.1126.50';
-import {buildPDF,auditLegacyCoverage} from './plan-pdf.mjs?v=2.0.1126.50';
+import {withoutLegacyLabel,tidyLegacySupplies,clearCareFlags,relocateLegacyHospital,validReservation,reservationPeriods,readLineReservations,reservationLines,reservationSegments,inspectLineReservations,applyLineReservations,sortFamilyDirectory,validServiceDate,taipeiDate,nextBookingDate,orderUpcomingFamilies,recentFamilyIds,profileStages,safeProfileUrl,readProfile,familyArea,profileAge,matchesProfile,prepareProfilePatch,applyProfilePatch,bookingDateGroups,replaceBookingDates,bookingDateLabel,lineHistory,prepareLineHistory,applyLineHistory,syncOverview,matchesFamily,prepareLegacyBatch,noteSpecs,noteRows,writeNoteRows,noteCycle,noteActive,bindPendingNotes,activeFamily,bookingSegments,bookingLines,serviceName,fresh,blanks,fields,titles,day,filename,mediaLabel,warnings,publicBlocks,tasks,sourceKey,normalize,migrate} from './workspace-model.mjs?v=2.0.1126.51';
+import {makeText as legacyText} from './model.mjs?v=2.0.1126.51';
+import {DriveStore,digest} from './drive.mjs?v=2.0.1126.51';
+import {openDB,storeDB} from './drafts.mjs?v=2.0.1126.51';
+import {buildPDF,auditLegacyCoverage} from './plan-pdf.mjs?v=2.0.1126.51';
 const $=id=>document.getElementById(id),drive=new DriveStore(),db=storeDB(await openDB().catch(error=>{$('main').innerHTML='<div class="panel"><h1>目前無法啟用草稿保存</h1><p>此瀏覽器未能開啟本機資料庫，請換外部瀏覽器或檢查儲存空間；尚未開放填寫，避免資料遺失。</p></div>';throw error;}));
 let records=await db.all(),entry=null,view='service',kind='cat',petIndex=0,undo=[],syncTimer,localChain=Promise.resolve(),syncBusy=false,photoBusy=false,pdf=null,photoUrl=null,localFailure=false;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -273,8 +273,8 @@ function careReadFields(f,obj,defs,root,{inactive=false}={}){
   if(spec&&!rows.length)continue;
   if(!spec&&(typeof obj[key]!=='string'||!obj[key].trim()))continue;
   const block=crmEl('div','','care-read-field');block.append(crmEl('small',label,'care-read-label'));
-  if(spec){for(const r of rows){const active=noteActive(f,r),p=crmEl('p',r.text,'care-read-value');if(!active||inactive)p.classList.add('care-read-inactive');const flags=[];if(r.closed)flags.push('歷史紀錄');else if(!active)flags.push('上期事項・待確認');else if(inactive)flags.push('留存資訊・非本期指令');else{if(r.flag)flags.push('⚑ 小卡');if(r.temp)flags.push('僅限本期');}if(flags.length)block.append(crmEl('small',flags.join('・'),'care-read-state'));block.append(p);}}
-  else{const val=key==='status'&&obj===f.media?mediaLabel(f):obj[key];block.append(crmEl('p',val,'care-read-value'));}
+  if(spec){for(const r of rows){const active=noteActive(f,r),p=crmEl('p',withoutLegacyLabel(r.text),'care-read-value');if(!active||inactive)p.classList.add('care-read-inactive');const flags=[];if(r.closed)flags.push('歷史紀錄');else if(!active)flags.push('上期事項・待確認');else if(inactive)flags.push('留存資訊・非本期指令');else{if(r.flag)flags.push('⚑ 小卡');if(r.temp)flags.push('僅限本期');}if(flags.length)block.append(crmEl('small',flags.join('・'),'care-read-state'));block.append(p);}}
+  else{const val=key==='status'&&obj===f.media?mediaLabel(f):withoutLegacyLabel(obj[key]);block.append(crmEl('p',val,'care-read-value'));}
   root.append(block);
  }
 }
@@ -342,7 +342,7 @@ for(const type of ['health','dry','wet','snack','water','wash','play','toilet','
 const entryDefs=[['pickup','鑰匙取得'],['door','門鎖操作與防逃脫'],['return','鑰匙歸還'],['wifi','WiFi 名稱與密碼']];
 careBlock(content,f,'entry','進出、WiFi 與環境','entry',body=>{careReadFields(f,f.entry,entryDefs,body);careReadFields(f,f,[['environment','門窗與電器安排'],['extra','其他任務／本次特殊交代']],body);},body=>{const g=grid();for(const[k,l]of entryDefs)g.append(field(f.entry,k,l));g.append(field(f,'environment','門窗與電器安排',{long:true}),field(f,'extra','其他任務／本次特殊交代',{long:true}));body.append(g);});
 const review=document.createElement('div');review.className='panel';review.append(heading('填完後，快速確認'));review.append(button('檢查還有沒有需要補問的資料',()=>{review.querySelectorAll('.issue').forEach(e=>e.remove());const w=warnings(f);if(!w.length){const p=document.createElement('p');p.textContent='目前沒有偵測到關鍵缺漏，仍請依家訪確認內容為準。';review.append(p);}for(const text of w){const p=document.createElement('div');p.className='issue';p.textContent=text;review.append(p);}}));content.append(review);}
-function renderService(content){const f=entry.f;content.append(profilePanel(f));const linePlan=lineReservationPanel(f);if(linePlan)content.append(linePlan);const p=document.createElement('div');p.className='panel';p.append(heading('本次照護'));const desc=document.createElement('p');desc.textContent=bookingLines(f.booking,f.groups).join('\n')||'如需建立本次預約，可到家訪資料的預約區塊編輯。';desc.style.whiteSpace='pre-line';p.append(desc);const issues=warnings(f);for(const t of issues){const el=document.createElement('div');el.className='issue';el.textContent=t;p.append(el);}content.append(p);
+function renderService(content){const f=entry.f;content.append(profilePanel(f));const linePlan=lineReservationPanel(f);if(linePlan)content.append(linePlan);const p=document.createElement('div');p.className='panel';p.append(heading('本次照護'));const desc=document.createElement('p');desc.textContent=bookingLines(f.booking,f.groups).join('\n')||'如需建立本次預約，可到家訪資料的預約區塊編輯。';desc.style.whiteSpace='pre-line';p.append(desc);const issues=warnings(f);if(issues.length){const pending=section('待確認事項（'+issues.length+'）',false);for(const t of issues){const el=document.createElement('div');el.className='issue';el.textContent=t;pending.body.append(el);}p.append(pending.e);}content.append(p);
 if(f.importReview){const q=document.createElement('p');q.className='muted';q.textContent='請先複核舊資料，再建立本期照護小卡。';content.append(q);return;}const run=f.runs.at(-1);content.append(button(run?'建立下一趟勾選':'建立本趟照護小卡',async()=>{const warn=warnings(f);if(warn.length&&!await confirmAction('還有資料待確認','目前有 '+warn.length+' 項待確認。仍可建立小卡，現場請勿自行推測缺漏指示。','仍建立小卡'))return;const d=day();snapshot();f.runs.push({id:crypto.randomUUID(),label:d.year+'/'+d.month+'/'+d.day+' 第 '+(f.runs.length+1)+' 趟',createdAt:new Date().toISOString(),source:sourceKey(f),tasks:tasks(f),checks:{}});dirty();render();},'primary'));
 if(!run){const q=document.createElement('p');q.className='muted';q.textContent='離場前複核小卡只顯示已插旗的個別交代，勾選記錄按趟保留。';content.append(q);return;}
 const head=document.createElement('div');head.className='panel';head.append(heading(run.label));const stale=run.source!==sourceKey(f);if(stale){const el=document.createElement('div');el.className='issue';el.textContent='主資料已修改，這張小卡需要更新。已完成勾選不會套用到新的指示。';head.append(el,button('依最新資料更新本趟小卡',async()=>{if(await confirmAction('更新本趟小卡？','本趟原始小卡會保留為上一筆記錄，另建更新版；勾選從頭確認。','建立更新版')){snapshot();f.runs.push({id:crypto.randomUUID(),label:run.label+'（更新）',createdAt:new Date().toISOString(),source:sourceKey(f),tasks:tasks(f),checks:{}});dirty();render();}}));}
@@ -521,15 +521,15 @@ async function cleanupCareData(mode){
  importingLegacy=true;status();
  try{
   await localChain;
-  const compute=f=>{if(mode==='flags'){const r=clearCareFlags(f);return {copy:r.copy,count:r.count,review:0};}const r=relocateLegacyHospital(f);return {copy:r.copy,count:r.moved,review:r.review};};
+  const compute=f=>{if(mode==='flags'){const r=clearCareFlags(f);return {copy:r.copy,count:r.count,review:0};}if(mode==='supplies')return tidyLegacySupplies(f);const r=relocateLegacyHospital(f);return {copy:r.copy,count:r.moved,review:r.review};};
   const plan=records.filter(r=>mode==='flags'||!r.f.archived).map(r=>({r,f:r.f,rev:r.rev,result:compute(r.f)}));
   const count=plan.reduce((n,x)=>n+x.result.count,0),review=plan.filter(x=>x.result.review);
-  const body=crmEl('div'),dlg=crmDialog(mode==='flags'?'清除全域小卡旗標':'整理舊家訪醫院',body);
-  body.append(crmEl('p',mode==='flags'?'全部家庭目前的旗標（含已刪除家庭）都改為不加入小卡。文字、時效、待確認狀態及已產生的歷史小卡不變。':'只搬移原問卷「指定救援醫院」與舊其他任務完全相符的資料，保留完整原文，搬移後仍待你確認。','muted'));
+  const body=crmEl('div'),dlg=crmDialog(mode==='flags'?'清除全域小卡旗標':mode==='supplies'?'整理備品位置與菜瓜布':'整理舊家訪醫院',body);
+  body.append(crmEl('p',mode==='flags'?'全部家庭目前的旗標（含已刪除家庭）都改為不加入小卡。文字、時效、待確認狀態及已產生的歷史小卡不變。':mode==='supplies'?'只補入原備註中明確的備品位置，保留原文與時效，不覆蓋已有欄位。將已記載有菜瓜布但使用方式待確認的項目改為寵物專用，共用或否定例外保留。':'只搬移原問卷「指定救援醫院」與舊其他任務完全相符的資料，保留完整原文，搬移後仍待你確認。','muted'));
   body.append(crmEl('strong','預計 '+plan.filter(x=>x.result.count).length+' 戶，'+count+' 項'));
-  if(review.length){const s=section('有差異，未自動搬移（'+review.length+' 戶）',false);for(const x of review)s.body.append(crmEl('p',x.f.name));body.append(s.e);}
+  if(review.length){const s=section('有差異，未自動修正（'+review.length+' 戶）',false);for(const x of review)s.body.append(crmEl('p',x.f.name));body.append(s.e);}
   const cancel=dlg.querySelector(':scope > button:last-child');
-  const apply=button(mode==='flags'?'確認清除全部旗標':'確認搬移醫院',async()=>{
+  const apply=button(mode==='flags'?'確認清除全部旗標':mode==='supplies'?'確認整理備品與菜瓜布':'確認搬移醫院',async()=>{
    if(apply.disabled)return;if(!ready()||draining||syncBusy||connecting||photoBusy||brandSyncActive)return toast('請先連線 Drive 並完成同步。');
    apply.disabled=true;cancel.disabled=true;
    try{
@@ -541,7 +541,7 @@ async function cleanupCareData(mode){
      result.copy.updatedAt=new Date().toISOString();const next={...r,f:result.copy,rev:r.rev+1};
      if(!await db.replaceUnchanged(r,next)){skip++;continue;}Object.assign(r,next);saved+=result.count;
     }
-    dlg.close();undo=[];pdf=null;render();toast('已保存 '+saved+' 項，略過 '+skip+' 戶；請核對同步狀態。'+(review.length?' 另有 '+review.length+' 戶醫院待核對。':''));
+    dlg.close();undo=[];pdf=null;render();toast('已保存 '+saved+' 項，略過 '+skip+' 戶；請核對同步狀態。'+(review.length?' 另有 '+review.length+' 戶待核對。':''));
    }catch(e){toast('未全部完成，可重新開啟檢查。'+e.message);}
    finally{apply.disabled=false;cancel.disabled=false;}
   },'primary');
@@ -678,7 +678,7 @@ function editLineReservation(f,r){
 }
 
 function wireMenu(){
- $('clearCareFlags').onclick=()=>cleanupCareData('flags');$('relocateHospital').onclick=()=>cleanupCareData('hospital');
+ $('clearCareFlags').onclick=()=>cleanupCareData('flags');$('relocateHospital').onclick=()=>cleanupCareData('hospital');$('tidySupplies').onclick=()=>cleanupCareData('supplies');
  $('lineBookingImport').onclick=()=>$('lineBookingFile').click();$('lineBookingFile').onchange=e=>{if(e.target.files[0])importLineBookings(e.target.files[0]);};
  $('carePatchImport').onclick=()=>$('carePatchFile').click();$('carePatchFile').onchange=e=>{if(e.target.files[0])importCareFields(e.target.files[0]);};
  const menu=$('appMenu');

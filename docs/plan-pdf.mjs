@@ -1,8 +1,8 @@
-import {quoteLines,overtimeText} from './quote.mjs?v=2.0.1126.50';
-import {activeFamily,filename,careBlocks,serviceName,bookingLines} from './workspace-model.mjs?v=2.0.1126.50';
-import {brandDefaults,links,palette} from './brand.mjs?v=2.0.1126.50';
+import {quoteLines,overtimeText} from './quote.mjs?v=2.0.1126.51';
+import {withoutLegacyLabel,activeFamily,filename,careBlocks,serviceName,bookingLines} from './workspace-model.mjs?v=2.0.1126.51';
+import {brandDefaults,links,palette} from './brand.mjs?v=2.0.1126.51';
 const W=794,H=1123,M=38,B=1060,inner=W-2*M;
-const clean=values=>values.filter(x=>typeof x==='string'&&x.trim());
+const clean=values=>values.filter(x=>typeof x==='string'&&x.trim()).map(withoutLegacyLabel).filter(Boolean);
 const sentence=value=>/[。！？.!?]$/.test(value.trim())?value.trim():value.trim()+'。';
 const petStory=p=>{
  const identity=clean([p.age,p.identity,p.sex]).join('・');
@@ -51,7 +51,7 @@ function washLines(wash){
  for(const [key,detailKey,name] of [['sponge','spongePlace','菜瓜布'],['soap','soapPlace','洗碗精']]){
   const status=clean([wash[key]])[0]?.trim(),detail=clean([wash[detailKey]])[0]?.trim();
   if(!status&&!detail)continue;
-  const wording={'有，寵物專用':'有寵物專用'+name,'有，使用方式待確認':'備有'+name+'（是否專用待確認）','與人共用':name+'與家人共用','不使用':'不使用'+name,'無':'沒有'+name,'無寵物專用，使用方式待確認':'未提供寵物專用'+name+'（清潔方式待確認）','待家長提供':name+'待家長提供'};
+  const wording={'有，寵物專用':key==='sponge'?'有寵物菜瓜布':'有寵物專用'+name,'有，使用方式待確認':'備有'+name+'（是否專用待確認）','與人共用':name+'與家人共用','不使用':'不使用'+name,'無':'沒有'+name,'無寵物專用，使用方式待確認':'未提供寵物專用'+name+'（清潔方式待確認）','待家長提供':name+'待家長提供'};
   const description=wording[status]||(status?name+'（'+status+'）':name);
   output.push(sentence(description+(detail?'（'+detail+'）':'')));
  }
@@ -79,7 +79,7 @@ export async function buildPDF(f,brand=brandDefaults){
  function wrap(value,width,size=15,bold=false){
   ctx.font=font(size,bold);
   const out=[];
-  for(const paragraph of String(value).split(/\r?\n/)){
+  for(const paragraph of String(withoutLegacyLabel(String(value))).split(/\r?\n/)){
    let row='';
    for(const ch of paragraph){
     if(row && ctx.measureText(row+ch).width>width){
