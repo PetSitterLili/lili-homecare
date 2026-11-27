@@ -269,3 +269,5 @@ dialog.family-filter-dialog[open]{display:flex;flex-direction:column}
 .custom-quote-studio>select,.custom-quote-studio>button{margin-bottom:8px}
 .custom-quote-studio .crm-result{margin:10px 0}
 .custom-quote-studio[hidden],.quick-options[hidden],.quick-output[hidden]{display:none!important}
+
+.custom-quote-studio{scroll-margin-top:80px}.custom-quote-studio .crm-result{overflow-wrap:anywhere}
