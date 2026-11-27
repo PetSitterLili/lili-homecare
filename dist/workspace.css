@@ -219,3 +219,20 @@ dialog.family-filter-dialog[open]{display:flex;flex-direction:column}
 .care-reading-body .care-edit-daily{padding-top:10px;border-top:1px solid #e9e4ed}
 .care-reading-body .care-edit-grid .clear{min-height:26px;padding:2px 4px;flex:none}
 @media(max-width:340px){.care-reading-body .care-edit-grid{grid-template-columns:1fr}}
+
+/* Directory: compact per-family sync state and floating search suggestions. */
+#families .family-card-open .family-sync{display:inline-flex;align-items:center;gap:5px;font-size:11px;line-height:1.25;margin-top:4px;max-width:100%;width:max-content}
+#families .family-sync .sync-dot{width:7px;height:7px;flex:none;box-shadow:none}
+#families .family-sync[data-tone=green] .sync-dot{background:#65977c;box-shadow:0 0 0 2px #65977c22}
+#families .family-sync[data-tone=amber] .sync-dot{background:#c49a50;box-shadow:0 0 0 2px #c49a5022}
+#families .family-sync[data-tone=red] .sync-dot{background:#c66871;box-shadow:0 0 0 2px #c6687122}
+#familySearchWrap{position:relative;min-width:0}
+.family-searchbar #search{width:100%;padding-right:42px}
+#clearSearch{position:absolute;top:50%;right:4px;transform:translateY(-50%);width:35px;min-width:35px;height:35px;min-height:35px;padding:0;line-height:1;font-size:23px;border:0;background:transparent;color:#81758c}
+#clearSearch[hidden]{display:none!important}
+#recentFamilySearch{position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:35;margin:0;padding:4px;background:#fff;border:1px solid #e4dfeb;border-radius:12px;box-shadow:0 8px 24px #44345322;max-height: min(46vh,320px);overflow-y:auto}
+#recentFamilyItems{display:grid;gap:0;overflow:visible;padding:0}
+#recentFamilyItems .search-suggestion{display:flex;align-items:center;gap:9px;text-align:left;white-space:normal;border:0;border-radius:7px;min-height:42px;padding:8px;background:#fff;color:#4c4355;font-size:14px;width:100%;overflow-wrap:anywhere}
+#recentFamilyItems .search-suggestion:hover,#recentFamilyItems .search-suggestion:focus-visible{background:#f3eff7}
+#recentFamilyItems .suggestion-icon{color:#8c7e99;flex:none;width:19px;text-align:center;font-size:17px}
+#recentFamilyItems>p{margin:8px;font-size:13px}

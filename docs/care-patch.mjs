@@ -1,4 +1,4 @@
-import {noteSpecs,noteRows,fields} from './workspace-model.mjs?v=2.0.1126.53';
+import {noteSpecs,noteRows,fields} from './workspace-model.mjs?v=2.0.1126.54';
 
 const own=(o,k)=>Object.hasOwn(o,k)?o[k]:null;
 const same=(a,b)=>a.value===b.value&&a.rows===b.rows;
