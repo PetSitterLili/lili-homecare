@@ -1,4 +1,4 @@
-import {noteSpecs,fields} from './workspace-model.mjs?v=2.0.1126.52';
+import {noteSpecs,noteRows,fields} from './workspace-model.mjs?v=2.0.1126.53';
 
 const own=(o,k)=>Object.hasOwn(o,k)?o[k]:null;
 const same=(a,b)=>a.value===b.value&&a.rows===b.rows;
@@ -58,4 +58,72 @@ export function applyCarePatch(packet,family,selected){
   (copy.carePatchReceipts??=[]).push(set.id);count++;
  }
  return {copy,count};
+}
+
+// Convert a private, reviewed food proposal into exact-current-state care patches.
+// Never fill a nonempty or explicitly cleared destination; never promote temporal rows.
+export function prepareFoodRefinement(packet,families){
+ if(packet?.format!=='lili-food-refinement'||packet.version!==1||!Array.isArray(packet.families)||packet.families.length>500)throw Error('飲食精修檔格式錯誤');
+ const output={format:'lili-care-field-patch',version:1,families:[]},seen=new Set(),summary={eligible:0,skipped:0,unchanged:0,removed:0,review:[]};
+ const state=(o,k)=>({value:own(o,k),rows:own(o,'careNoteRows_'+k)});
+ const bare=s=>String(s??'').trim();
+ for(const h of packet.families){
+  if(typeof h.id!=='string'||seen.has(h.id)||typeof h.importSource!=='string'||typeof h.diet!=='string'||!Array.isArray(h.groups)||h.groups.length>6)throw Error('飲食家庭格式錯誤');
+  seen.add(h.id);const f=families.find(x=>x.id===h.id),sets=[],used=new Set();
+  const raw=f?.importOriginal?.split('【飲食照顧細節】')[1]?.split('【飲水照顧細節】')[0]?.trim();
+  for(const g of h.groups){
+   const key=g.kind+'/'+g.type;
+   if(!['cat','dog'].includes(g.kind)||!['dry','wet','snack'].includes(g.type)||used.has(key)||!Array.isArray(g.notes)||!g.notes.every(x=>typeof x==='string')||!Array.isArray(g.items)||g.items.length>7)throw Error('飲食區塊格式錯誤');
+   used.add(key);const itemKeys=new Set();
+   for(const x of g.items){
+    if(!['item','amount','unit','location','leftover','water'].includes(x.key)||!fields[g.type].some(([k])=>k===x.key)||itemKeys.has(x.key)||typeof x.value!=='string'||!x.value.trim()||x.value.length>2000||typeof x.evidence!=='string'||!x.evidence.trim()||!h.diet.includes(x.evidence)||!g.notes.some(n=>n.includes(x.evidence)))throw Error('飲食來源或欄位格式錯誤');
+    itemKeys.add(x.key);
+   }
+   const o=f?.groups[g.kind]?.food[g.type],spec=f&&o&&noteSpecs(f).find(s=>s.obj===o&&s.key==='note');
+   const reason=t=>{summary.skipped+=g.items.length;summary.review.push({name:f?.name||h.name,block:key,reason:t});};
+   if(!f||f.archived||f.importReview!==true||f.importSource!==h.importSource||raw!==h.diet||!o||!spec){reason('家庭來源不符、已完成複核或未找到');continue;}
+   const rows=noteRows(spec);if(!rows.length||rows.some(r=>r.temp||r.closed||r.ownerFlag)){reason('備註時效或人工裁決已變更');continue;}
+   const note=bare(o.note),actual=rows.filter(r=>r.text.trim()).map(r=>r.text).join('\n');
+   if(bare(actual)!==note){reason('備註文字與明細不一致');continue;}
+   // Accept the exact original/previous patch text, or exact known location-only deletions.
+   const loc=bare(o.location),noun={dry:'(?:補充)?飼料(?:備品)?|乾乾(?:備品)?',wet:'(?:罐頭|餐包|濕食)(?:備品)?',snack:'(?:零食|肉泥)(?:備品)?'}[g.type];
+   const pattern=new RegExp('^(?:備品(?:位置)?|'+noun+')(?:都|會|是|兩款都|均)?(?:放在|放於|在|[：:])([^。！？；，、\\n]+)[。.]?$');
+   const locOnly=line=>{const v=bare(line).replace(/^[🌟⭐📍➡️❣️\s]+/u,'').trim();return !!loc&&(bare(line)===loc||v===loc||pattern.exec(v)?.[1]?.trim()===loc);};
+   const canon=s=>bare(s).replace(/\r\n/g,'\n');
+   if(!g.notes.some(n=>canon(n)===canon(note)||loc&&canon(n.split(/\r?\n/).filter(l=>!locOnly(l)).join('\n'))===canon(note))){reason('原備註已變動，保留現況');continue;}
+   const changes=[],accepted=new Map(),proposal=Object.fromEntries(g.items.map(x=>[x.key,x]));
+   const portionSafe=['amount','unit'].every(k=>{const s=state(o,k),x=proposal[k];return x?(s.value===null&&s.rows===null||s.value===x.value&&s.rows===null)&&actual.includes(x.evidence):s.value===null&&s.rows===null;});
+   for(const x of g.items){
+    if(!actual.includes(x.evidence)||(['amount','unit'].includes(x.key)&&!portionSafe)){summary.skipped++;continue;}
+    const cur=state(o,x.key);
+    if(cur.value===x.value){summary.unchanged++;continue;}
+    if(cur.value!==null||cur.rows!==null){summary.skipped++;summary.review.push({name:f.name,block:key,reason:x.key+' 已有值或已清除，不覆蓋'});continue;}
+    if(x.key==='amount'&&o.unit!=null&&(!proposal.unit||o.unit!==proposal.unit.value)||x.key==='unit'&&o.amount!=null&&(!proposal.amount||o.amount!==proposal.amount.value)){summary.skipped++;continue;}
+    const dstSpec=noteSpecs(f).find(s=>s.obj===o&&s.key===x.key);
+    const afterRows=dstSpec?JSON.stringify([{id:'food-53-'+g.kind+'-'+g.type+'-'+x.key,text:x.value,flag:false,temp:false,cycle:'',closed:false}]):null;
+    changes.push({path:key+'/'+x.key,before:cur,after:{value:x.value,rows:afterRows}});accepted.set(x.key,x.value);summary.eligible++;
+   }
+   if(!changes.length)continue;
+   // Only delete whole, standalone duplicate lines when the complete line exists in a destination.
+   // No removal of flagged or owner-marked rows; keep mixed clauses, conditions and other instructions.
+   const exact=new Set([...accepted.values()].map(bare));
+   if(accepted.has('amount')&&accepted.has('unit'))exact.add(accepted.get('amount')+accepted.get('unit'));
+   let removed=0;const revised=[];
+   for(const r of rows){
+    if(r.flag||r.ownerFlag){revised.push(r);continue;}
+    const lines=r.text.split(/\r?\n/).filter(l=>{
+     if(!l.trim())return true;
+     const v=l.trim().replace(/^[🌟⭐📍➡️❣️\s]+/u,'').trim();
+     const hit=exact.has(l.trim())||exact.has(v);
+     if(hit){removed++;return false;}return true;
+    });
+    if(lines.some(l=>l.trim()))revised.push({...r,text:lines.join('\n')});
+   }
+   const before=state(o,'note'),after=removed?{value:revised.map(r=>r.text).join('\n'),rows:JSON.stringify(revised)}:before;
+   changes.push({path:key+'/note',before,after});summary.removed+=removed;
+   sets.push({id:'food53-'+g.kind+'-'+g.type,label:(g.kind==='cat'?'喵寶':'犬寶')+'・'+({dry:'乾乾',wet:'濕食',snack:'零食'}[g.type])+'飲食細項',changes});
+  }
+  if(sets.length)output.families.push({id:h.id,name:f.name,importSource:h.importSource,sets});
+ }
+ return {packet:output,summary};
 }

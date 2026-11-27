@@ -1,6 +1,6 @@
-import {quoteLines,overtimeText} from './quote.mjs?v=2.0.1126.52';
-import {withoutLegacyLabel,activeFamily,filename,careBlocks,serviceName,bookingLines} from './workspace-model.mjs?v=2.0.1126.52';
-import {brandDefaults,links,palette} from './brand.mjs?v=2.0.1126.52';
+import {quoteLines,overtimeText} from './quote.mjs?v=2.0.1126.53';
+import {withoutLegacyLabel,activeFamily,filename,careBlocks,serviceName,bookingLines} from './workspace-model.mjs?v=2.0.1126.53';
+import {brandDefaults,links,palette} from './brand.mjs?v=2.0.1126.53';
 const W=794,H=1123,M=38,B=1060,inner=W-2*M;
 const clean=values=>values.filter(x=>typeof x==='string'&&x.trim()).map(withoutLegacyLabel).filter(Boolean);
 const sentence=value=>/[。！？.!?]$/.test(value.trim())?value.trim():value.trim()+'。';
@@ -22,7 +22,7 @@ function careText(kind,o){
  switch(kind){
   case 'dry':case 'wet':case 'snack':{
    const portion=clean([o.amount,o.unit]).join('');
-   lines=[together(o.item,portion&&'每次給予'+portion),o.water,location(o.location)];
+   lines=[together(o.item,portion&&'份量：'+portion),o.water,location(o.location)];
    if(o.leftover)lines.push(o.leftover==='移出洗碗後放回'?'如有剩食，先移出，清洗碗具後再放回':'如有剩食，'+o.leftover);
    if(detail)lines.push(kind==='snack'?mark(detail):detail);
    if(o.mix){const ratio=together(o.mixItem,o.mixAmount);lines.push(ratio?'混糧搭配為'+ratio:'需要混糧');}
