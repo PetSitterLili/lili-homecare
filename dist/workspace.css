@@ -221,7 +221,7 @@ dialog.family-filter-dialog[open]{display:flex;flex-direction:column}
 @media(max-width:340px){.care-reading-body .care-edit-grid{grid-template-columns:1fr}}
 
 /* Directory: compact per-family sync state and floating search suggestions. */
-#families .family-card-open .family-sync{display:inline-flex;align-items:center;gap:5px;font-size:11px;line-height:1.25;margin-top:4px;max-width:100%;width:max-content}
+#families .family-name-line{display:flex;align-items:baseline;gap:6px;min-width:0}#families .family-name-text{min-width:0;overflow-wrap:anywhere}#families .family-card-open .family-sync{display:inline-flex;align-items:center;flex:none;align-self:flex-start;margin-top:.48em;width:7px;height:7px}
 #families .family-sync .sync-dot{width:7px;height:7px;flex:none;box-shadow:none}
 #families .family-sync[data-tone=green] .sync-dot{background:#65977c;box-shadow:0 0 0 2px #65977c22}
 #families .family-sync[data-tone=amber] .sync-dot{background:#c49a50;box-shadow:0 0 0 2px #c49a5022}
