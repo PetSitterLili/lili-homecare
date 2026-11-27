@@ -1,13 +1,13 @@
-import {inspectCarePatch,applyCarePatch,prepareFoodRefinement} from './care-patch.mjs?v=2.0.1126.55';
-import {rememberGrant,recallGrant,forgetGrant} from './tab-grant.mjs?v=2.0.1126.55';
-import {displayQuoteLabel,legacyQuoteReference,oldBookingText,hasCurrentBooking,inquiryQuote,mixedPlan,mixedCare,mixedService,defaultRates,readRates,days,travel,rate,holidayRows,quoteKey,savedQuote,quoteLines,money,overtimeText} from './quote.mjs?v=2.0.1126.55';
-import {brandDefaults,readBrand} from './brand.mjs?v=2.0.1126.55';
+import {inspectCarePatch,applyCarePatch,prepareFoodRefinement} from './care-patch.mjs?v=2.0.1126.56';
+import {rememberGrant,recallGrant,forgetGrant} from './tab-grant.mjs?v=2.0.1126.56';
+import {displayQuoteLabel,legacyQuoteReference,oldBookingText,hasCurrentBooking,inquiryQuote,mixedPlan,mixedCare,mixedService,defaultRates,readRates,days,travel,rate,holidayRows,quoteKey,savedQuote,quoteLines,money,overtimeText} from './quote.mjs?v=2.0.1126.56';
+import {brandDefaults,readBrand} from './brand.mjs?v=2.0.1126.56';
 
-import {dedupeLegacySupplies,withoutLegacyLabel,tidyLegacySupplies,clearCareFlags,relocateLegacyHospital,validReservation,reservationPeriods,readLineReservations,reservationLines,reservationSegments,inspectLineReservations,applyLineReservations,sortFamilyDirectory,validServiceDate,taipeiDate,nextBookingDate,orderUpcomingFamilies,recentFamilyIds,profileStages,safeProfileUrl,readProfile,familyArea,profileAge,matchesProfile,prepareProfilePatch,applyProfilePatch,bookingDateGroups,replaceBookingDates,bookingDateLabel,lineHistory,prepareLineHistory,applyLineHistory,syncOverview,matchesFamily,prepareLegacyBatch,noteSpecs,noteRows,writeNoteRows,noteCycle,noteActive,bindPendingNotes,activeFamily,bookingSegments,bookingLines,serviceName,fresh,blanks,fields,titles,day,filename,mediaLabel,warnings,publicBlocks,tasks,sourceKey,normalize,migrate} from './workspace-model.mjs?v=2.0.1126.55';
-import {makeText as legacyText} from './model.mjs?v=2.0.1126.55';
-import {DriveStore,digest} from './drive.mjs?v=2.0.1126.55';
-import {openDB,storeDB} from './drafts.mjs?v=2.0.1126.55';
-import {buildPDF,auditLegacyCoverage} from './plan-pdf.mjs?v=2.0.1126.55';
+import {dedupeLegacySupplies,withoutLegacyLabel,tidyLegacySupplies,clearCareFlags,relocateLegacyHospital,validReservation,reservationPeriods,readLineReservations,reservationLines,reservationSegments,inspectLineReservations,applyLineReservations,sortFamilyDirectory,validServiceDate,taipeiDate,nextBookingDate,orderUpcomingFamilies,recentFamilyIds,profileStages,safeProfileUrl,readProfile,familyArea,profileAge,matchesProfile,prepareProfilePatch,applyProfilePatch,bookingDateGroups,replaceBookingDates,bookingDateLabel,lineHistory,prepareLineHistory,applyLineHistory,syncOverview,matchesFamily,prepareLegacyBatch,noteSpecs,noteRows,writeNoteRows,noteCycle,noteActive,bindPendingNotes,activeFamily,bookingSegments,bookingLines,serviceName,fresh,blanks,fields,titles,day,filename,mediaLabel,warnings,publicBlocks,tasks,sourceKey,normalize,migrate} from './workspace-model.mjs?v=2.0.1126.56';
+import {makeText as legacyText} from './model.mjs?v=2.0.1126.56';
+import {DriveStore,digest} from './drive.mjs?v=2.0.1126.56';
+import {openDB,storeDB} from './drafts.mjs?v=2.0.1126.56';
+import {buildPDF,auditLegacyCoverage} from './plan-pdf.mjs?v=2.0.1126.56';
 const $=id=>document.getElementById(id),drive=new DriveStore(),db=storeDB(await openDB().catch(error=>{$('main').innerHTML='<div class="panel"><h1>目前無法啟用草稿保存</h1><p>此瀏覽器未能開啟本機資料庫，請換外部瀏覽器或檢查儲存空間；尚未開放填寫，避免資料遺失。</p></div>';throw error;}));
 let records=await db.all(),entry=null,view='service',kind='cat',petIndex=0,undo=[],syncTimer,localChain=Promise.resolve(),syncBusy=false,photoBusy=false,pdf=null,photoUrl=null,localFailure=false;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -131,7 +131,15 @@ function heading(text){return labelText(document.createElement('h3'),text);}
 function field(obj,key,label,{long=false,options=null,compact=false,placeholder=''}={}){const spec=!options&&entry&&noteSpecs(entry.f).find(s=>s.obj===obj&&s.key===key);if(spec)return careNoteField(spec,label,placeholder);const wrap=document.createElement('div');wrap.className='field'+(compact?' compact':'');const head=document.createElement('div');head.className='fieldhead';const l=document.createElement('span');labelText(l,label);head.append(l,button('清除',async()=>{if(!obj[key])return;if(await confirmAction('清除此欄？','只清除「'+label+'」，其他資料不變。','確認清除')){snapshot();obj[key]='';dirty();input.value='';}},'clear'));let input=document.createElement(options?'select':long?'textarea':'input');input.setAttribute('aria-label',label);input.placeholder=placeholder;
 if(options){const values=['',...new Set([...options,...(obj[key]&&!options.includes(obj[key])?[obj[key]]:[])])];for(const v of values){const o=document.createElement('option');o.value=v;o.textContent=v||'尚未確認';input.append(o);}input.onchange=()=>{snapshot();obj[key]=input.value;dirty();};}else input.oninput=()=>{snapshot();obj[key]=input.value;dirty();};input.value=obj[key]||'';wrap.append(head,input);return wrap;}
 
-function resizeCareNote(t){t.style.height='auto';t.style.height=Math.max(t.scrollHeight+2,44)+'px';}
+function resizeCareNote(t){if(!t.getClientRects().length)return;t.style.height='0px';t.style.height=Math.max(t.scrollHeight+2,44)+'px';}
+function splitCareNote(rows,row,value,position,id){
+ const at=rows.indexOf(row);if(at<0)return null;
+ const text=String(value),cut=Math.max(0,Math.min(text.length,position));
+ const left=text.slice(0,cut),right=text.slice(cut);
+ // Keep all text, including selections; both pieces retain the original lifetime.
+ const next={...row,id,text:right,flag:!!right.trim()&&row.flag};
+ row.text=left;rows.splice(at+1,0,next);return next;
+}
 document.addEventListener('click',e=>{if(!e.target.closest?.('.care-note-flag-group'))document.querySelectorAll('.care-note-menu').forEach(m=>{m.hidden=true;m.parentElement.querySelector('.care-note-arrow')?.setAttribute('aria-expanded','false');});});
 document.addEventListener('toggle',e=>{if(e.target instanceof HTMLDetailsElement&&e.target.open)requestAnimationFrame(()=>e.target.querySelectorAll('.care-note-body textarea').forEach(resizeCareNote));},true);
 window.addEventListener('resize',()=>document.querySelectorAll('.care-note-body textarea').forEach(resizeCareNote));
@@ -145,8 +153,8 @@ function careNoteField(spec,label,placeholder){
  if(!rows.length)rows=[blank()];
  const save=()=>{writeNoteRows(spec,rows);dirty();};
  const resize=resizeCareNote;
- const draw=focus=>{
-  list.replaceChildren();
+ const draw=(focus,caret=null)=>{
+  let focusInput=null;list.replaceChildren();
   for(const n of rows){
    const line=document.createElement('div');line.className='care-note-row';
    const body=document.createElement('div');body.className='care-note-body';
@@ -178,11 +186,34 @@ function careNoteField(spec,label,placeholder){
     state.hidden=!state.textContent;line.classList.toggle('care-note-expired',!active);end.hidden=!n.temp||n.closed;
     for(let i=0;i<options.length;i++){const [,v,t]=options[i];menu.children[i].classList.toggle('active',!n.closed&&active&&v===n.flag&&t===n.temp);}
    }
+   let composing=false,keepLineBreak=false;
+   input.addEventListener('compositionstart',()=>{composing=true;});
+   input.addEventListener('compositionend',()=>{composing=false;resize(input);});
+   const split=()=>{
+    if(entry?.f!==f||!input.isConnected||!rows.includes(n))return;
+    snapshot();
+    const next=splitCareNote(rows,n,input.value,input.selectionStart??input.value.length,crypto.randomUUID());
+    if(!next)return;save();draw(next.id,0);
+   };
+   input.addEventListener('keydown',e=>{
+    if(e.key!=='Enter'||e.isComposing||composing||e.keyCode===229)return;
+    if(e.shiftKey){keepLineBreak=true;return;}
+    if(e.ctrlKey||e.metaKey||e.altKey)return;
+    e.preventDefault();split();
+   });
+   input.addEventListener('keyup',e=>{if(e.key==='Enter'||e.key==='Shift')keepLineBreak=false;});
+   input.addEventListener('beforeinput',e=>{
+    if(!['insertLineBreak','insertParagraph'].includes(e.inputType)||e.isComposing||composing)return;
+    if(keepLineBreak){keepLineBreak=false;return;}
+    if(!e.cancelable)return;
+    e.preventDefault();split();
+   });
    input.oninput=()=>{snapshot();n.text=input.value;save();resize(input);};
-   line.append(body,actions);list.append(line);paint();requestAnimationFrame(()=>{resize(input);if(focus===n.id)input.focus({preventScroll:true});});
+   line.append(body,actions);list.append(line);paint();if(focus===n.id)focusInput=input;requestAnimationFrame(()=>resize(input));
   }
+  if(focusInput){resize(focusInput);focusInput.focus({preventScroll:true});if(caret!==null){focusInput.setSelectionRange(caret,caret);requestAnimationFrame(()=>{if(focusInput.isConnected&&document.activeElement===focusInput)focusInput.scrollIntoView({block:'nearest',inline:'nearest',behavior:'instant'});});}}
  };
- const add=button('＋ 新增一項',()=>{const n=blank();rows.push(n);draw(n.id);},'care-note-add');wrap.append(add);draw();return wrap;
+ const add=button('＋ 新增一項',()=>{const n=blank();rows.push(n);draw(n.id);},'care-note-add');add.title='Enter 拆成下一項・Shift + Enter 在同項換行';wrap.append(add);draw();return wrap;
 }
 
 function check(label,checked,fn){const l=document.createElement('label');l.className='check';const i=document.createElement('input');i.type='checkbox';i.checked=checked;i.onchange=()=>fn(i.checked);l.append(i);labelText(l,label);return l;}
